@@ -1,7 +1,7 @@
 export type UploadedImage = {
   id: string;
   name: string;
-  dataUrl: string;
+  objectUrl: string;
   originalWidthPx: number;
   originalHeightPx: number;
   targetPrintDiagonalIn: number | null;

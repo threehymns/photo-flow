@@ -39,7 +39,7 @@ const PrintableContent = React.forwardRef<
           {layout.photos.map((photo) => (
             <img
               key={photo.id}
-              src={photo.dataUrl}
+              src={photo.objectUrl}
               alt={photo.name}
               style={{
                 position: "absolute",
@@ -124,35 +124,28 @@ export default function PrintPage() {
         }
 
         return new Promise<UploadedImage>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-              resolve({
-                id: `${Date.now()}-${index}-${processedFile.name}`,
-                name: processedFile.name,
-                dataUrl: e.target?.result as string,
-                originalWidthPx: img.width,
-                originalHeightPx: img.height,
-                targetPrintDiagonalIn: null,
-                rawFile: file, // Keep track of the original file
-              });
-            };
-            img.onerror = (error) =>
-              reject(
-                new Error(
-                  `Failed to load image: ${processedFile.name}. Error: ${error}`,
-                ),
-              );
-            img.src = e.target?.result as string;
+          const objectURL = URL.createObjectURL(processedFile);
+          const img = new Image();
+          img.onload = () => {
+            resolve({
+              id: `${Date.now()}-${index}-${processedFile.name}`,
+              name: processedFile.name,
+              objectUrl: objectURL,
+              originalWidthPx: img.width,
+              originalHeightPx: img.height,
+              targetPrintDiagonalIn: null,
+              rawFile: file, // Keep track of the original file
+            });
           };
-          reader.onerror = (error) =>
+          img.onerror = (error) => {
+            URL.revokeObjectURL(objectURL);
             reject(
               new Error(
-                `Failed to read file: ${processedFile.name}. Error: ${error}`,
+                `Failed to load image: ${processedFile.name}. Error: ${error}`,
               ),
             );
-          reader.readAsDataURL(processedFile);
+          };
+          img.src = objectURL;
         });
       });
 
@@ -450,6 +443,39 @@ export default function PrintPage() {
     return () => resizeObserver.disconnect();
   }, [pageLayouts]);
 
+  const imagesRef = useRef(uploadedImages);
+  imagesRef.current = uploadedImages;
+
+  useEffect(() => {
+    const calculateScale = () => {
+      if (!previewContainerRef.current) return;
+      const availableWidth = previewContainerRef.current.clientWidth - 32; // p-4
+      const availableHeight = previewContainerRef.current.clientHeight - 32; // p-4
+
+      const scaleX = availableWidth / (LETTER_WIDTH_IN * RENDER_DPI);
+      const scaleY = availableHeight / (LETTER_HEIGHT_IN * RENDER_DPI);
+
+      setPreviewScale(Math.max(0.1, Math.min(scaleX, scaleY, 1.0)));
+    };
+
+    calculateScale();
+    const resizeObserver = new ResizeObserver(calculateScale);
+    if (previewContainerRef.current) {
+      resizeObserver.observe(previewContainerRef.current);
+    }
+
+    return () => resizeObserver.disconnect();
+  }, [pageLayouts]);
+
+  useEffect(() => {
+    // On unmount, revoke all object URLs
+    return () => {
+      imagesRef.current.forEach((image) => {
+        URL.revokeObjectURL(image.objectUrl);
+      });
+    };
+  }, []);
+
   const pageStyle = `
         @page {
             size: ${LETTER_WIDTH_IN}in ${LETTER_HEIGHT_IN}in;
@@ -506,10 +532,15 @@ export default function PrintPage() {
   }, [handlePrint, isPrintEnabled]);
 
   const handleClearAll = () => {
+    uploadedImages.forEach((image) => URL.revokeObjectURL(image.objectUrl));
     setUploadedImages([]);
   };
 
   const handleRemoveImage = (id: string) => {
+    const imageToRemove = uploadedImages.find((img) => img.id === id);
+    if (imageToRemove) {
+      URL.revokeObjectURL(imageToRemove.objectUrl);
+    }
     setUploadedImages((prev) => prev.filter((img) => img.id !== id));
   };
 
@@ -573,7 +604,7 @@ export default function PrintPage() {
                           }}
                         >
                           <img
-                            src={photo.dataUrl}
+                            src={photo.objectUrl}
                             alt={photo.name}
                             className="h-full w-full object-cover"
                           />
