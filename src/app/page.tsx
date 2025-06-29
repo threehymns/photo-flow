@@ -574,6 +574,9 @@ export default function PrintPage() {
             >
               {pageLayouts.map((layout, pageIndex) => (
                 <React.Fragment key={pageIndex}>
+                  <div className="flex w-full items-center justify-center py-2 text-sm text-muted-foreground">
+                    Page {pageIndex + 1} of {pageLayouts.length}
+                  </div>
                   <div
                     className="relative mb-4 overflow-hidden bg-white last:mb-0"
                     style={{
@@ -684,9 +687,6 @@ export default function PrintPage() {
                     </Popover.Root>
                   ))}
                   </div>
-                    <div className="flex w-full items-center justify-center py-2 text-sm text-muted-foreground">
-                      Page {pageIndex + 2} of {pageLayouts.length}
-                    </div>
                 </React.Fragment>
               ))}
             </div>
