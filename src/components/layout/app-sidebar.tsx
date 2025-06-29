@@ -108,7 +108,7 @@ export function AppSidebar({
             </SidebarGroupLabel>
             <div className="space-y-4 p-4">
               <div className="space-y-2">
-                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="global-size">Global Size ({displayGlobalSizeIn.toFixed(1)}" diag)</Label>
+                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="global-size">Global Size ({displayGlobalSizeIn.toFixed(1)}&quot; diag)</Label>
                 <Slider
                   id="global-size"
                   min={1}
@@ -124,7 +124,7 @@ export function AppSidebar({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label className="text-sm font-medium text-muted-foreground" htmlFor="margin">Page Margin</Label>
-                  <span className="text-xs text-muted-foreground">{marginIn.toFixed(2)}"</span>
+                  <span className="text-xs text-muted-foreground">{marginIn.toFixed(2)}&quot;</span>
                 </div>
                 <Slider
                   id="margin"
@@ -140,7 +140,7 @@ export function AppSidebar({
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label className="text-sm font-medium text-muted-foreground" htmlFor="gap">Gap</Label>
-                  <span className="text-xs text-muted-foreground">{gapIn.toFixed(2)}"</span>
+                  <span className="text-xs text-muted-foreground">{gapIn.toFixed(2)}&quot;</span>
                 </div>
                 <Slider
                   id="gap"

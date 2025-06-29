@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import type { UploadedImage, PrintPageLayout } from "@/lib/types";
+import Image from "next/image";
 import { Image as ImageIcon, X } from "lucide-react";
 
 // Constants
@@ -37,10 +38,8 @@ const PrintableContent = React.forwardRef<
           }}
         >
           {layout.photos.map((photo) => (
-            <img
+            <div
               key={photo.id}
-              src={photo.objectUrl}
-              alt={photo.name}
               style={{
                 position: "absolute",
                 left: `${photo.printXPx / RENDER_DPI}in`,
@@ -48,7 +47,14 @@ const PrintableContent = React.forwardRef<
                 width: `${photo.printWidthPx / RENDER_DPI}in`,
                 height: `${photo.printHeightPx / RENDER_DPI}in`,
               }}
-            />
+            >
+              <Image
+                src={photo.objectUrl}
+                alt={photo.name}
+                fill
+                style={{ objectFit: "cover" }}
+              />
+            </div>
           ))}
         </div>
       ))}
@@ -74,11 +80,9 @@ export default function PrintPage() {
 
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const printComponentRef = useRef<HTMLDivElement>(null);
-  const [isPrintReady, setIsPrintReady] = useState(false);
   const [selectedImage, setSelectedImage] = useState<UploadedImage | null>(
     null,
   );
-  const [overrideSizeIn, setOverrideSizeIn] = useState(3.5);
 
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
@@ -119,13 +123,13 @@ export default function PrintPage() {
             setConversionProgress((convertedCount / filesToConvert.length) * 100);
           } catch (error) {
             console.error(`Failed to convert HEIC file: ${file.name}`, error);
-            throw new Error(`Failed to convert HEIC file: ${file.name}. Error: ${error}`);
+            throw new Error(`Failed to convert HEIC file: ${file.name}. Error: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
 
         return new Promise<UploadedImage>((resolve, reject) => {
           const objectURL = URL.createObjectURL(processedFile);
-          const img = new Image();
+          const img = document.createElement('img');
           img.onload = () => {
             resolve({
               id: `${Date.now()}-${index}-${processedFile.name}`,
@@ -137,11 +141,11 @@ export default function PrintPage() {
               rawFile: file, // Keep track of the original file
             });
           };
-          img.onerror = (error) => {
+          img.onerror = (errorEvent) => {
             URL.revokeObjectURL(objectURL);
             reject(
               new Error(
-                `Failed to load image: ${processedFile.name}. Error: ${error}`,
+                `Failed to load image: ${processedFile.name}. Error: ${errorEvent instanceof Event ? `Event type: ${errorEvent.type}` : String(errorEvent)}`,
               ),
             );
           };
@@ -166,7 +170,7 @@ export default function PrintPage() {
       }
     };
 
-    processFiles();
+    void processFiles();
   };
 
   const processedImages = React.useMemo(() => {
@@ -365,18 +369,10 @@ export default function PrintPage() {
           }
           return updatedImages;
         });
-        setOverrideSizeIn(sizeInInches || 3.5);
       }
     },
-    [selectedImage],
+    [selectedImage, setUploadedImages],
   );
-
-  // Reset override size when selected image changes
-  useEffect(() => {
-    if (selectedImage) {
-      setOverrideSizeIn(selectedImage.targetPrintDiagonalIn || 3.5);
-    }
-  }, [selectedImage]);
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -386,9 +382,10 @@ export default function PrintPage() {
         !event
           .composedPath()
           .some(
-            (el: any) =>
-              el?.classList?.contains("popover-content") ||
-              el?.classList?.contains("popover-trigger"),
+            (el) =>
+              el instanceof Element &&
+              (el.classList.contains("popover-content") ||
+                el.classList.contains("popover-trigger")),
           )
       ) {
         setSelectedImage(null);
@@ -502,11 +499,10 @@ export default function PrintPage() {
   const handlePrint = useReactToPrint({
     pageStyle: pageStyle,
     onAfterPrint: () => {
-      setIsPrintReady(false);
+      console.log("after print");
     },
-    onPrintError: (errorLocation: string, error: Error) => {
-      console.error(`Error during printing (${errorLocation}):`, error);
-      setIsPrintReady(false);
+    onPrintError: (errorLocation: string, error: unknown) => {
+      console.error(`Error during printing (${errorLocation}):`, error instanceof Error ? error.message : String(error));
     },
     documentTitle: "Photo Print Layout",
     contentRef: printComponentRef,
@@ -556,7 +552,7 @@ export default function PrintPage() {
         gapIn={gapIn}
         uploadedImages={uploadedImages}
         handleImageUpload={handleImageUpload}
-        handlePrint={handlePrint!}
+        handlePrint={handlePrint}
         handleClearAll={handleClearAll}
         setDisplayGlobalSizeIn={setDisplayGlobalSizeIn}
         setMarginIn={setMarginIn}
@@ -603,14 +599,15 @@ export default function PrintPage() {
                             height: `${photo.printHeightPx / RENDER_DPI}in`,
                           }}
                         >
-                          <img
+                          <Image
                             src={photo.objectUrl}
                             alt={photo.name}
+                            fill
                             className="h-full w-full object-cover"
                           />
                           {photo.targetPrintDiagonalIn !== null && (
                             <div className="absolute right-0 bottom-0 rounded-tl-sm bg-blue-600 px-1 py-0.5 font-mono text-[8px] text-white">
-                              {photo.targetPrintDiagonalIn.toFixed(1)}"
+                              {photo.targetPrintDiagonalIn.toFixed(1)}&quot;
                             </div>
                           )}
                           <Button
@@ -643,8 +640,8 @@ export default function PrintPage() {
                                 Diagonal:{" "}
                                 {selectedImage?.targetPrintDiagonalIn?.toFixed(
                                   1,
-                                ) || "0.0"}
-                                "
+                                ) ?? "0.0"}
+                                &quot;
                               </Label>
                             </div>
                             <Slider
@@ -653,11 +650,11 @@ export default function PrintPage() {
                               max={10}
                               step={0.1}
                               value={[
-                                selectedImage?.targetPrintDiagonalIn || 3.5,
+                                selectedImage?.targetPrintDiagonalIn ?? 3.5,
                               ]}
                               onValueChange={(value) => {
                                 if (selectedImage) {
-                                  const newSize = value[0] || 3.5;
+                                  const newSize = value[0] ?? 3.5;
                                   updateSelectedImageSize(newSize);
                                 }
                               }}

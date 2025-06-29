@@ -91,7 +91,7 @@ export function FileUpload({
   };
 
   const acceptString = Object.entries(accept)
-    .flatMap(([type, exts]) => exts.map((ext) => `.${ext.replace(/^\./, "")}`))
+    .flatMap(([, exts]) => exts.map((ext) => `.${ext.replace(/^\./, "")}`))
     .join(",");
 
   return (

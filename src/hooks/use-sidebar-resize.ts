@@ -136,7 +136,7 @@ export function useSidebarResize({
 	autoCollapseThreshold = 1.5, // Default to collapsing at minWidth + 50%
 	expandThreshold = 0.2,
 	enableDrag = true,
-	setIsDraggingRail = () => {},
+	setIsDraggingRail,
 	widthCookieName,
 	widthCookieMaxAge = 60 * 60 * 24 * 7, // 1 week default
 	isNested = false,
@@ -277,7 +277,7 @@ export function useSidebarResize({
 			const deltaX = Math.abs(e.clientX - startX.current);
 			if (!isDragging.current && deltaX > 5) {
 				isDragging.current = true;
-				setIsDraggingRail(true);
+				setIsDraggingRail?.(true);
 			}
 
 			if (isDragging.current) {
@@ -449,7 +449,7 @@ export function useSidebarResize({
 			dragDistanceFromToggle.current = 0;
 			dragOffset.current = 0;
 			railRect.current = null;
-			setIsDraggingRail(false);
+			setIsDraggingRail?.(false);
 		};
 
 		document.addEventListener("mousemove", handleMouseMove);
