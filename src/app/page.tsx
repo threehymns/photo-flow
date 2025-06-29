@@ -176,81 +176,184 @@ export default function PrintPage() {
     processFiles();
   };
 
-  const calculateLayout = useCallback(() => {
-    if (uploadedImages.length === 0) {
-      setPageLayouts([]);
-      return;
-    }
-
-    const usablePageWidthIn = LETTER_WIDTH_IN - 2 * marginIn;
-    const usablePageHeightIn = LETTER_HEIGHT_IN - 2 * marginIn;
-
-    if (usablePageWidthIn <= 0 || usablePageHeightIn <= 0) {
-      setPageLayouts([{ photos: [] }]);
-      return;
-    }
-
-    const spacingPx = gapIn * RENDER_DPI;
-    const newPageLayouts: PrintPageLayout[] = [];
-    newPageLayouts[0] = { photos: [] };
-    let currentPageIndex = 0;
-    let currentX = marginIn * RENDER_DPI;
-    let currentY = marginIn * RENDER_DPI;
-    let currentRowMaxHeight = 0;
-
-    uploadedImages.forEach((img) => {
+  const processedImages = React.useMemo(() => {
+    return uploadedImages.map((img) => {
       const targetDiagonalIn = img.targetPrintDiagonalIn ?? globalTargetSizeIn;
-      if (targetDiagonalIn <= 0) return;
-
+      if (targetDiagonalIn <= 0) {
+        return { ...img, printWidthPx: 0, printHeightPx: 0 };
+      }
       const aspectRatio = img.originalHeightPx / img.originalWidthPx;
       const printWidthIn =
         targetDiagonalIn / Math.sqrt(1 + aspectRatio * aspectRatio);
       const printHeightIn = aspectRatio * printWidthIn;
       const printWidthPx = printWidthIn * RENDER_DPI;
       const printHeightPx = printHeightIn * RENDER_DPI;
+      return { ...img, printWidthPx, printHeightPx };
+    });
+  }, [uploadedImages, globalTargetSizeIn]);
 
-      if (printWidthPx <= 0 || printHeightPx <= 0) return;
+  const calculateLayout = useCallback(() => {
+    if (processedImages.length === 0) {
+      setPageLayouts([]);
+      return;
+    }
 
-      if (
-        currentX + printWidthPx >
-        (marginIn + usablePageWidthIn) * RENDER_DPI
-      ) {
-        currentX = marginIn * RENDER_DPI;
-        currentY += currentRowMaxHeight + spacingPx;
-        currentRowMaxHeight = 0;
+    const usablePageWidthPx = (LETTER_WIDTH_IN - 2 * marginIn) * RENDER_DPI;
+    const usablePageHeightPx = (LETTER_HEIGHT_IN - 2 * marginIn) * RENDER_DPI;
+
+    if (usablePageWidthPx <= 0 || usablePageHeightPx <= 0) {
+      setPageLayouts([{ photos: [] }]);
+      return;
+    }
+
+    const spacingPx = gapIn * RENDER_DPI;
+    const newPageLayouts: PrintPageLayout[] = [];
+
+    type EmptySpace = { x: number; y: number; w: number; h: number };
+    const pageEmptySpaces: EmptySpace[][] = [];
+
+    const addNewPage = () => {
+      newPageLayouts.push({ photos: [] });
+      pageEmptySpaces.push([
+        {
+          x: marginIn * RENDER_DPI,
+          y: marginIn * RENDER_DPI,
+          w: usablePageWidthPx,
+          h: usablePageHeightPx,
+        },
+      ]);
+    };
+
+    addNewPage();
+
+    processedImages.forEach((img) => {
+      if (!img.printWidthPx || !img.printHeightPx || img.printWidthPx <= 0 || img.printHeightPx <= 0) {
+        return;
       }
 
-      if (
-        currentY + printHeightPx >
-        (marginIn + usablePageHeightIn) * RENDER_DPI
-      ) {
-        newPageLayouts.push({ photos: [] });
-        currentPageIndex++;
-        currentX = marginIn * RENDER_DPI;
-        currentY = marginIn * RENDER_DPI;
-        currentRowMaxHeight = 0;
+      let placed = false;
+      let bestFit: { pageIdx: number; spaceIdx: number; score: number } | null = null;
+
+      for (let pageIdx = 0; pageIdx < newPageLayouts.length; pageIdx++) {
+        const spaces = pageEmptySpaces[pageIdx];
+        if (!spaces) continue;
+
+        for (let spaceIdx = 0; spaceIdx < spaces.length; spaceIdx++) {
+          const space = spaces[spaceIdx];
+          if (!space) continue;
+
+          if (img.printWidthPx <= space.w && img.printHeightPx <= space.h) {
+            const score = space.w * space.h; // Simple score: prefer smaller spaces
+            if (!bestFit || score < bestFit.score) {
+              bestFit = { pageIdx, spaceIdx, score };
+            }
+          }
+        }
       }
 
-      const currentPage = newPageLayouts[currentPageIndex];
-      if (!currentPage) {
-        // This should not happen if we pushed it above, but as a safeguard:
-        newPageLayouts[currentPageIndex] = { photos: [] };
+      if (bestFit) {
+        const { pageIdx, spaceIdx } = bestFit;
+        const spaces = pageEmptySpaces[pageIdx];
+        if (!spaces || spaceIdx >= spaces.length) {
+          console.error("Invalid space index");
+          return;
+        }
+        const space = spaces[spaceIdx];
+        if (!space) {
+          console.error("Space not found");
+          return;
+        }
+
+        const layout = newPageLayouts[pageIdx];
+        if (!layout) {
+          console.error("Layout not found");
+          return;
+        }
+        layout.photos.push({
+          ...img,
+          printXPx: space.x,
+          printYPx: space.y,
+        });
+
+        const requiredWidth = img.printWidthPx + spacingPx;
+        const requiredHeight = img.printHeightPx + spacingPx;
+
+        const newSpaces: EmptySpace[] = [];
+        // Horizontal cut:
+        // R1: space below
+        if (space.h > requiredHeight) {
+            newSpaces.push({
+                x: space.x,
+                y: space.y + requiredHeight,
+                w: space.w,
+                h: space.h - requiredHeight,
+            });
+        }
+        // R2: space to the right of photo
+        if (space.w > requiredWidth) {
+            newSpaces.push({
+                x: space.x + requiredWidth,
+                y: space.y,
+                w: space.w - requiredWidth,
+                h: img.printHeightPx,
+            });
+        }
+        
+        spaces.splice(spaceIdx, 1, ...newSpaces);
+        placed = true;
       }
 
-      newPageLayouts[currentPageIndex]!.photos.push({
-        ...img,
-        printXPx: currentX,
-        printYPx: currentY,
-        printWidthPx: printWidthPx,
-        printHeightPx: printHeightPx,
-      });
 
-      currentX += printWidthPx + spacingPx;
-      currentRowMaxHeight = Math.max(currentRowMaxHeight, printHeightPx);
+      if (!placed) {
+        addNewPage();
+        const newPageIdx = newPageLayouts.length - 1;
+        const newPageLayout = newPageLayouts[newPageIdx];
+        const newPageSpaces = pageEmptySpaces[newPageIdx];
+
+        if (!newPageLayout || !newPageSpaces || newPageSpaces.length === 0) {
+          console.error("Failed to create a new page correctly.");
+          return;
+        }
+        const firstSpace = newPageSpaces[0];
+        if (!firstSpace) {
+          console.error("No space available on new page.");
+          return;
+        }
+
+        if (img.printWidthPx <= firstSpace.w && img.printHeightPx <= firstSpace.h) {
+            newPageLayout.photos.push({
+                ...img,
+                printXPx: firstSpace.x,
+                printYPx: firstSpace.y,
+            });
+
+            const requiredWidth = img.printWidthPx + spacingPx;
+            const requiredHeight = img.printHeightPx + spacingPx;
+
+            const newSpaces: EmptySpace[] = [];
+            if (firstSpace.h > requiredHeight) {
+                newSpaces.push({
+                    x: firstSpace.x,
+                    y: firstSpace.y + requiredHeight,
+                    w: firstSpace.w,
+                    h: firstSpace.h - requiredHeight,
+                });
+            }
+            if (firstSpace.w > requiredWidth) {
+                newSpaces.push({
+                    x: firstSpace.x + requiredWidth,
+                    y: firstSpace.y,
+                    w: firstSpace.w - requiredWidth,
+                    h: img.printHeightPx,
+                });
+            }
+            newPageSpaces.splice(0, 1, ...newSpaces);
+        }
+      }
     });
 
     setPageLayouts(newPageLayouts);
-  }, [uploadedImages, globalTargetSizeIn, marginIn, gapIn]);
+  }, [processedImages, marginIn, gapIn]);
 
   const updateSelectedImageSize = useCallback(
     (sizeInInches: number | null) => {
@@ -316,7 +419,7 @@ export default function PrintPage() {
         clearTimeout(debounceTimeoutRef.current);
       }
     };
-  }, [globalTargetSizeIn, marginIn, gapIn, uploadedImages, calculateLayout]);
+  }, [calculateLayout]);
 
   useEffect(() => {
     setDisplayGlobalSizeIn(globalTargetSizeIn);
@@ -324,7 +427,7 @@ export default function PrintPage() {
 
   useEffect(() => {
     calculateLayout();
-  }, [calculateLayout]);
+  }, [processedImages, calculateLayout]);
 
   useEffect(() => {
     const calculateScale = () => {
