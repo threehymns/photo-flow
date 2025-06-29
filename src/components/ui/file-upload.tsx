@@ -98,9 +98,9 @@ export function FileUpload({
     <div className={`w-full ${className}`}>
       <div
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 transition-colors",
+          "rounded-lg border-2 border-dashed p-6 transition-colors",
           isDragging ? "border-primary bg-primary/5" : "border-border",
-          disabled ? "opacity-50 cursor-not-allowed" : "",
+          disabled ? "cursor-not-allowed opacity-50" : "",
           "relative",
         )}
         onDragOver={handleDragOver}
@@ -108,14 +108,14 @@ export function FileUpload({
         onDrop={handleDrop}
       >
         <div className="flex flex-col items-center justify-center space-y-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 p-2">
-            <Upload className="h-6 w-6 text-primary" />
+          <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-full p-2">
+            <Upload className="text-primary h-6 w-6" />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
+            <p className="text-foreground text-sm font-medium">
               {isDragging ? "Drop files here" : "Drag & drop files here"}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Or click to browse (max {maxFiles} files, up to{" "}
               {formatFileSize(maxSize)} each)
             </p>
@@ -143,7 +143,7 @@ export function FileUpload({
 
         {/* Hidden file counter */}
         {files.length > 0 && (
-          <div className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-medium">
+          <div className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
             {files.length}
           </div>
         )}

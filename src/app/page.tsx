@@ -98,13 +98,18 @@ export default function PrintPage() {
     const processFiles = async () => {
       const heic2any = (await import("heic2any")).default;
       const filesToConvert = files.filter(
-        (file) => file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic"),
+        (file) =>
+          file.type === "image/heic" ||
+          file.name.toLowerCase().endsWith(".heic"),
       );
       let convertedCount = 0;
 
       const newImagesPromises = files.map(async (file, index) => {
         let processedFile = file;
-        if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+        if (
+          file.type === "image/heic" ||
+          file.name.toLowerCase().endsWith(".heic")
+        ) {
           try {
             setIsConverting(true);
             const convertedBlob = await heic2any({
@@ -120,16 +125,20 @@ export default function PrintPage() {
               },
             );
             convertedCount++;
-            setConversionProgress((convertedCount / filesToConvert.length) * 100);
+            setConversionProgress(
+              (convertedCount / filesToConvert.length) * 100,
+            );
           } catch (error) {
             console.error(`Failed to convert HEIC file: ${file.name}`, error);
-            throw new Error(`Failed to convert HEIC file: ${file.name}. Error: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+              `Failed to convert HEIC file: ${file.name}. Error: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         }
 
         return new Promise<UploadedImage>((resolve, reject) => {
           const objectURL = URL.createObjectURL(processedFile);
-          const img = document.createElement('img');
+          const img = document.createElement("img");
           img.onload = () => {
             resolve({
               id: `${Date.now()}-${index}-${processedFile.name}`,
@@ -224,12 +233,18 @@ export default function PrintPage() {
     addNewPage();
 
     processedImages.forEach((img) => {
-      if (!img.printWidthPx || !img.printHeightPx || img.printWidthPx <= 0 || img.printHeightPx <= 0) {
+      if (
+        !img.printWidthPx ||
+        !img.printHeightPx ||
+        img.printWidthPx <= 0 ||
+        img.printHeightPx <= 0
+      ) {
         return;
       }
 
       let placed = false;
-      let bestFit: { pageIdx: number; spaceIdx: number; score: number } | null = null;
+      let bestFit: { pageIdx: number; spaceIdx: number; score: number } | null =
+        null;
 
       for (let pageIdx = 0; pageIdx < newPageLayouts.length; pageIdx++) {
         const spaces = pageEmptySpaces[pageIdx];
@@ -279,27 +294,26 @@ export default function PrintPage() {
         // Horizontal cut:
         // R1: space below
         if (space.h > requiredHeight) {
-            newSpaces.push({
-                x: space.x,
-                y: space.y + requiredHeight,
-                w: space.w,
-                h: space.h - requiredHeight,
-            });
+          newSpaces.push({
+            x: space.x,
+            y: space.y + requiredHeight,
+            w: space.w,
+            h: space.h - requiredHeight,
+          });
         }
         // R2: space to the right of photo
         if (space.w > requiredWidth) {
-            newSpaces.push({
-                x: space.x + requiredWidth,
-                y: space.y,
-                w: space.w - requiredWidth,
-                h: img.printHeightPx,
-            });
+          newSpaces.push({
+            x: space.x + requiredWidth,
+            y: space.y,
+            w: space.w - requiredWidth,
+            h: img.printHeightPx,
+          });
         }
-        
+
         spaces.splice(spaceIdx, 1, ...newSpaces);
         placed = true;
       }
-
 
       if (!placed) {
         addNewPage();
@@ -317,34 +331,37 @@ export default function PrintPage() {
           return;
         }
 
-        if (img.printWidthPx <= firstSpace.w && img.printHeightPx <= firstSpace.h) {
-            newPageLayout.photos.push({
-                ...img,
-                printXPx: firstSpace.x,
-                printYPx: firstSpace.y,
+        if (
+          img.printWidthPx <= firstSpace.w &&
+          img.printHeightPx <= firstSpace.h
+        ) {
+          newPageLayout.photos.push({
+            ...img,
+            printXPx: firstSpace.x,
+            printYPx: firstSpace.y,
+          });
+
+          const requiredWidth = img.printWidthPx + spacingPx;
+          const requiredHeight = img.printHeightPx + spacingPx;
+
+          const newSpaces: EmptySpace[] = [];
+          if (firstSpace.h > requiredHeight) {
+            newSpaces.push({
+              x: firstSpace.x,
+              y: firstSpace.y + requiredHeight,
+              w: firstSpace.w,
+              h: firstSpace.h - requiredHeight,
             });
-
-            const requiredWidth = img.printWidthPx + spacingPx;
-            const requiredHeight = img.printHeightPx + spacingPx;
-
-            const newSpaces: EmptySpace[] = [];
-            if (firstSpace.h > requiredHeight) {
-                newSpaces.push({
-                    x: firstSpace.x,
-                    y: firstSpace.y + requiredHeight,
-                    w: firstSpace.w,
-                    h: firstSpace.h - requiredHeight,
-                });
-            }
-            if (firstSpace.w > requiredWidth) {
-                newSpaces.push({
-                    x: firstSpace.x + requiredWidth,
-                    y: firstSpace.y,
-                    w: firstSpace.w - requiredWidth,
-                    h: img.printHeightPx,
-                });
-            }
-            newPageSpaces.splice(0, 1, ...newSpaces);
+          }
+          if (firstSpace.w > requiredWidth) {
+            newSpaces.push({
+              x: firstSpace.x + requiredWidth,
+              y: firstSpace.y,
+              w: firstSpace.w - requiredWidth,
+              h: img.printHeightPx,
+            });
+          }
+          newPageSpaces.splice(0, 1, ...newSpaces);
         }
       }
     });
@@ -502,7 +519,10 @@ export default function PrintPage() {
       console.log("after print");
     },
     onPrintError: (errorLocation: string, error: unknown) => {
-      console.error(`Error during printing (${errorLocation}):`, error instanceof Error ? error.message : String(error));
+      console.error(
+        `Error during printing (${errorLocation}):`,
+        error instanceof Error ? error.message : String(error),
+      );
     },
     documentTitle: "Photo Print Layout",
     contentRef: printComponentRef,
@@ -541,7 +561,7 @@ export default function PrintPage() {
   };
 
   return (
-    <div className="print:hidden flex w-full">
+    <div className="flex w-full print:hidden">
       <AppSidebar
         isLoading={isLoading}
         isConverting={isConverting}
@@ -559,32 +579,32 @@ export default function PrintPage() {
         setUploadedImages={setUploadedImages}
         setGapIn={setGapIn}
         setGlobalTargetSizeIn={setGlobalTargetSizeIn}
-        />
-        <SidebarInset
-          ref={previewContainerRef}
-          className="flex items-center justify-center overflow-auto p-4"
-        >
-          {isPrintEnabled ? (
-            <div
-              className="shadow-lg"
-              style={{
-                transform: `scale(${previewScale})`,
-                transformOrigin: "top center",
-              }}
-            >
-              {pageLayouts.map((layout, pageIndex) => (
-                <React.Fragment key={pageIndex}>
-                  <div className="flex w-full items-center justify-center py-2 text-sm text-muted-foreground">
-                    Page {pageIndex + 1} of {pageLayouts.length}
-                  </div>
-                  <div
-                    className="relative mb-4 overflow-hidden bg-white last:mb-0"
-                    style={{
-                      width: `${LETTER_WIDTH_IN}in`,
-                      height: `${LETTER_HEIGHT_IN}in`,
-                      boxShadow: "0 0 0.5rem rgba(0,0,0,0.1)",
-                    }}
-                  >
+      />
+      <SidebarInset
+        ref={previewContainerRef}
+        className="flex items-center justify-center overflow-auto p-4"
+      >
+        {isPrintEnabled ? (
+          <div
+            className="shadow-lg"
+            style={{
+              transform: `scale(${previewScale})`,
+              transformOrigin: "top center",
+            }}
+          >
+            {pageLayouts.map((layout, pageIndex) => (
+              <React.Fragment key={pageIndex}>
+                <div className="text-muted-foreground flex w-full items-center justify-center py-2 text-sm">
+                  Page {pageIndex + 1} of {pageLayouts.length}
+                </div>
+                <div
+                  className="relative mb-4 overflow-hidden bg-white last:mb-0"
+                  style={{
+                    width: `${LETTER_WIDTH_IN}in`,
+                    height: `${LETTER_HEIGHT_IN}in`,
+                    boxShadow: "0 0 0.5rem rgba(0,0,0,0.1)",
+                  }}
+                >
                   {layout.photos.map((photo) => (
                     <Popover.Root
                       key={photo.id}
@@ -616,7 +636,7 @@ export default function PrintPage() {
                           <Button
                             variant="destructive"
                             size="icon"
-                            className="absolute top-1 right-1 h-5 w-5 rounded-full opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+                            className="pointer-events-none absolute top-1 right-1 h-5 w-5 rounded-full opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRemoveImage(photo.id);
@@ -636,7 +656,7 @@ export default function PrintPage() {
                           <h4 className="text-center text-sm font-medium">
                             Adjust Photo Size
                           </h4>
-  
+
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label htmlFor="size-slider" className="text-xs">
@@ -664,7 +684,7 @@ export default function PrintPage() {
                               className="py-2"
                             />
                           </div>
-  
+
                           <div className="flex gap-2 pt-1">
                             <Button
                               onClick={() => updateSelectedImageSize(null)}
@@ -686,22 +706,22 @@ export default function PrintPage() {
                       </Popover.Content>
                     </Popover.Root>
                   ))}
-                  </div>
-                </React.Fragment>
-              ))}
-            </div>
-          ) : (
-            <div className="m-auto text-center">
-              <ImageIcon className="text-muted-foreground mx-auto h-12 w-12" />
-              <h3 className="text-muted-foreground mt-4 text-sm font-medium">
-                No photos uploaded
-              </h3>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Upload some photos to begin.
-              </p>
-            </div>
-          )}
-        </SidebarInset>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        ) : (
+          <div className="m-auto text-center">
+            <ImageIcon className="text-muted-foreground mx-auto h-12 w-12" />
+            <h3 className="text-muted-foreground mt-4 text-sm font-medium">
+              No photos uploaded
+            </h3>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Upload some photos to begin.
+            </p>
+          </div>
+        )}
+      </SidebarInset>
       {/* Always render the PrintableContent but keep it hidden */}
       <div style={{ display: "none" }}>
         <PrintableContent ref={printComponentRef} pageLayouts={pageLayouts} />
