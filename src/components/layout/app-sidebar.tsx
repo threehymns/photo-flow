@@ -2,10 +2,9 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Label } from "@/components/ui/label";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Loader2, Printer, Trash2 } from "lucide-react";
+import { SliderWithReset } from "@/components/ui/slider-with-reset";
 import { Progress } from "@/components/ui/progress";
 import {
   Sidebar,
@@ -19,6 +18,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { UploadedImage } from "@/lib/types";
+import { DEFAULT_DIAGONAL_IN, DEFAULT_GAP_IN, DEFAULT_MARGIN_IN } from "@/app/page";
+import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
   isLoading: boolean;
@@ -60,7 +61,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { open } = useSidebar();
   return (
-    <Sidebar className={className} variant="inset">
+    <Sidebar className={cn("select-none", className)} variant="inset">
       <SidebarRail />
       <SidebarHeader className="">
         <h1 className="text-lg font-semibold">Photo Print</h1>
@@ -72,7 +73,7 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup className="px-3 py-2">
+        <SidebarGroup>
           <div className="space-y-1">
             <FileUpload
               value={uploadedImages.map((img) => img.rawFile)}
@@ -110,81 +111,48 @@ export function AppSidebar({
           </div>
         </SidebarGroup>
 
-        <SidebarGroup className="px-3 py-2">
-          <SidebarGroupLabel asChild>
-            <h2 className="">Controls</h2>
-          </SidebarGroupLabel>
-          <div className="space-y-4 p-4">
-            <div className="space-y-2">
-              <Label
-                className="text-muted-foreground block text-sm font-medium"
-                htmlFor="global-size"
-              >
-                Global Size ({displayGlobalSizeIn.toFixed(1)}&quot; diag)
-              </Label>
-              <Slider
+        <SidebarGroup>
+          <SidebarGroupLabel>Controls</SidebarGroupLabel>
+          <div className="px-2">
+            <div className="space-y-4">
+              <SliderWithReset
                 id="global-size"
+                label="Global Size"
+                value={displayGlobalSizeIn}
                 min={1}
                 max={10}
                 step={0.01}
-                value={[displayGlobalSizeIn]}
-                onValueChange={(value) => {
-                  if (value[0] !== undefined) setDisplayGlobalSizeIn(value[0]);
+                onReset={() => {
+                  setDisplayGlobalSizeIn(DEFAULT_DIAGONAL_IN);
+                  setGlobalTargetSizeIn(DEFAULT_DIAGONAL_IN);
                 }}
-                onValueCommit={(value) => {
-                  if (value[0] !== undefined) setGlobalTargetSizeIn(value[0]);
+                format={(value) => `${value.toFixed(1)}" diag`}
+                onCommit={(value) => {
+                  setDisplayGlobalSizeIn(value);
+                  setGlobalTargetSizeIn(value);
                 }}
-                disabled={!isPrintEnabled}
               />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label
-                  className="text-muted-foreground text-sm font-medium"
-                  htmlFor="margin"
-                >
-                  Page Margin
-                </Label>
-                <span className="text-muted-foreground text-xs">
-                  {marginIn.toFixed(2)}&quot;
-                </span>
-              </div>
-              <Slider
+              <SliderWithReset
                 id="margin"
+                label="Page Margin"
+                value={marginIn}
                 min={0}
                 max={1}
                 step={0.01}
-                value={[marginIn]}
-                onValueChange={(value) => {
-                  if (value[0] !== undefined) setMarginIn(value[0]);
-                }}
-                disabled={!isPrintEnabled}
+                onReset={() => setMarginIn(DEFAULT_MARGIN_IN)}
+                format={(value) => `${value.toFixed(2)}"`}
+                onCommit={setMarginIn}
               />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label
-                  className="text-muted-foreground text-sm font-medium"
-                  htmlFor="gap"
-                >
-                  Gap
-                </Label>
-                <span className="text-muted-foreground text-xs">
-                  {gapIn.toFixed(2)}&quot;
-                </span>
-              </div>
-              <Slider
+              <SliderWithReset
                 id="gap"
+                label="Gap"
+                value={gapIn}
                 min={0}
                 max={1}
                 step={0.01}
-                value={[gapIn]}
-                onValueChange={(value) => {
-                  if (value[0] !== undefined) setGapIn(value[0]);
-                }}
-                disabled={!isPrintEnabled}
+                onReset={() => setGapIn(DEFAULT_GAP_IN)}
+                format={(value) => `${value.toFixed(2)}"`}
+                onCommit={setGapIn}
               />
             </div>
           </div>
@@ -196,14 +164,10 @@ export function AppSidebar({
           <div className="flex space-x-2">
             <Button
               onClick={handlePrint}
-              className="flex-1/2"
+              className="flex-1"
               disabled={!isPrintEnabled || isLoading}
             >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Printer className="h-4 w-4" />
-              )}
+              {isLoading ? <Loader2 className="animate-spin" /> : <Printer />}
               Print
             </Button>
             <Button
@@ -212,7 +176,7 @@ export function AppSidebar({
               className="flex-1"
               disabled={!isPrintEnabled || isLoading}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 />
               Clear All
             </Button>
           </div>

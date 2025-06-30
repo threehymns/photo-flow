@@ -5,8 +5,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { useReactToPrint } from "react-to-print";
 import * as Popover from "@radix-ui/react-popover";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { SliderWithReset } from "@/components/ui/slider-with-reset";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import type { UploadedImage, PrintPageLayout } from "@/lib/types";
@@ -15,9 +14,11 @@ import { Image as ImageIcon, X } from "lucide-react";
 
 // Constants
 const RENDER_DPI = 96;
-const LETTER_WIDTH_IN = 8.5;
-const LETTER_HEIGHT_IN = 11;
-const DEFAULT_TARGET_DIAGONAL_IN = 3.5;
+const PAPER_WIDTH_IN = 8.5;
+const PAPER_HEIGHT_IN = 11;
+export const DEFAULT_DIAGONAL_IN = 5;
+export const DEFAULT_MARGIN_IN = 0.1;
+export const DEFAULT_GAP_IN = 0;
 
 const PrintableContent = React.forwardRef<
   HTMLDivElement,
@@ -30,8 +31,8 @@ const PrintableContent = React.forwardRef<
           key={pageIndex}
           className="page-break"
           style={{
-            width: `${LETTER_WIDTH_IN}in`,
-            height: `${LETTER_HEIGHT_IN}in`,
+            width: `${PAPER_WIDTH_IN}in`,
+            height: `${PAPER_HEIGHT_IN}in`,
             position: "relative",
             overflow: "hidden",
             backgroundColor: "white",
@@ -66,14 +67,14 @@ PrintableContent.displayName = "PrintableContent";
 export default function PrintPage() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [globalTargetSizeIn, setGlobalTargetSizeIn] = useState<number>(
-    DEFAULT_TARGET_DIAGONAL_IN,
+    DEFAULT_DIAGONAL_IN,
   );
   const [displayGlobalSizeIn, setDisplayGlobalSizeIn] =
     useState<number>(globalTargetSizeIn);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [pageLayouts, setPageLayouts] = useState<PrintPageLayout[]>([]);
-  const [marginIn, setMarginIn] = useState<number>(0.1);
-  const [gapIn, setGapIn] = useState<number>(0);
+  const [marginIn, setMarginIn] = useState<number>(DEFAULT_MARGIN_IN);
+  const [gapIn, setGapIn] = useState<number>(DEFAULT_GAP_IN);
 
   const [previewScale, setPreviewScale] = useState(0.5);
   const [isLoading, setIsLoading] = useState(false);
@@ -204,8 +205,8 @@ export default function PrintPage() {
       return;
     }
 
-    const usablePageWidthPx = (LETTER_WIDTH_IN - 2 * marginIn) * RENDER_DPI;
-    const usablePageHeightPx = (LETTER_HEIGHT_IN - 2 * marginIn) * RENDER_DPI;
+    const usablePageWidthPx = (PAPER_WIDTH_IN - 2 * marginIn) * RENDER_DPI;
+    const usablePageHeightPx = (PAPER_HEIGHT_IN - 2 * marginIn) * RENDER_DPI;
 
     if (usablePageWidthPx <= 0 || usablePageHeightPx <= 0) {
       setPageLayouts([{ photos: [] }]);
@@ -442,8 +443,8 @@ export default function PrintPage() {
       const availableWidth = previewContainerRef.current.clientWidth - 32; // p-4
       const availableHeight = previewContainerRef.current.clientHeight - 32; // p-4
 
-      const scaleX = availableWidth / (LETTER_WIDTH_IN * RENDER_DPI);
-      const scaleY = availableHeight / (LETTER_HEIGHT_IN * RENDER_DPI);
+      const scaleX = availableWidth / (PAPER_WIDTH_IN * RENDER_DPI);
+      const scaleY = availableHeight / (PAPER_HEIGHT_IN * RENDER_DPI);
 
       setPreviewScale(Math.max(0.1, Math.min(scaleX, scaleY, 1.0)));
     };
@@ -466,8 +467,8 @@ export default function PrintPage() {
       const availableWidth = previewContainerRef.current.clientWidth - 32; // p-4
       const availableHeight = previewContainerRef.current.clientHeight - 32; // p-4
 
-      const scaleX = availableWidth / (LETTER_WIDTH_IN * RENDER_DPI);
-      const scaleY = availableHeight / (LETTER_HEIGHT_IN * RENDER_DPI);
+      const scaleX = availableWidth / (PAPER_WIDTH_IN * RENDER_DPI);
+      const scaleY = availableHeight / (PAPER_HEIGHT_IN * RENDER_DPI);
 
       setPreviewScale(Math.max(0.1, Math.min(scaleX, scaleY, 1.0)));
     };
@@ -492,7 +493,7 @@ export default function PrintPage() {
 
   const pageStyle = `
         @page {
-            size: ${LETTER_WIDTH_IN}in ${LETTER_HEIGHT_IN}in;
+            size: ${PAPER_WIDTH_IN}in ${PAPER_HEIGHT_IN}in;
             margin: 0;
         }
         @media print {
@@ -600,8 +601,8 @@ export default function PrintPage() {
                 <div
                   className="relative mb-4 overflow-hidden bg-white last:mb-0"
                   style={{
-                    width: `${LETTER_WIDTH_IN}in`,
-                    height: `${LETTER_HEIGHT_IN}in`,
+                    width: `${PAPER_WIDTH_IN}in`,
+                    height: `${PAPER_HEIGHT_IN}in`,
                     boxShadow: "0 0 0.5rem rgba(0,0,0,0.1)",
                   }}
                 >
@@ -657,33 +658,21 @@ export default function PrintPage() {
                             Adjust Photo Size
                           </h4>
 
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label htmlFor="size-slider" className="text-xs">
-                                Diagonal:{" "}
-                                {selectedImage?.targetPrintDiagonalIn?.toFixed(
-                                  1,
-                                ) ?? "0.0"}
-                                &quot;
-                              </Label>
-                            </div>
-                            <Slider
-                              id="size-slider"
-                              min={1}
-                              max={10}
-                              step={0.1}
-                              value={[
-                                selectedImage?.targetPrintDiagonalIn ?? 3.5,
-                              ]}
-                              onValueChange={(value) => {
-                                if (selectedImage) {
-                                  const newSize = value[0] ?? 3.5;
-                                  updateSelectedImageSize(newSize);
-                                }
-                              }}
-                              className="py-2"
-                            />
-                          </div>
+                          <SliderWithReset
+                            id="size-slider"
+                            label="Diagonal"
+                            value={selectedImage?.targetPrintDiagonalIn ?? globalTargetSizeIn ?? DEFAULT_DIAGONAL_IN}
+                            min={1}
+                            max={10}
+                            step={0.1}
+                            onReset={() => updateSelectedImageSize(null)}
+                            format={(value) => `${value.toFixed(1)}"`}
+                            onCommit={(value) => {
+                              if (selectedImage) {
+                                updateSelectedImageSize(value);
+                              }
+                            }}
+                          />
 
                           <div className="flex gap-2 pt-1">
                             <Button

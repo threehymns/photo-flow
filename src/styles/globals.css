@@ -117,7 +117,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/50 selection:bg-secondary selection:text-secondary-foreground;
   }
   body {
     @apply bg-background text-foreground;
