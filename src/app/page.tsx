@@ -6,7 +6,7 @@ import { useReactToPrint } from "react-to-print";
 import * as Popover from "@radix-ui/react-popover";
 import { Button } from "@/components/ui/button";
 import { SliderWithReset } from "@/components/ui/slider-with-reset";
-import { AppSidebar } from "@/components/layout/app-sidebar";
+import { AppSidebar, DEFAULT_DIAGONAL_IN, DEFAULT_GAP_IN, DEFAULT_MARGIN_IN } from "@/components/layout/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import type { UploadedImage, PrintPageLayout } from "@/lib/types";
 import Image from "next/image";
@@ -16,9 +16,6 @@ import { Image as ImageIcon, X } from "lucide-react";
 const RENDER_DPI = 96;
 const PAPER_WIDTH_IN = 8.5;
 const PAPER_HEIGHT_IN = 11;
-export const DEFAULT_DIAGONAL_IN = 5;
-export const DEFAULT_MARGIN_IN = 0.1;
-export const DEFAULT_GAP_IN = 0;
 
 const PrintableContent = React.forwardRef<
   HTMLDivElement,
@@ -599,7 +596,7 @@ export default function PrintPage() {
                   Page {pageIndex + 1} of {pageLayouts.length}
                 </div>
                 <div
-                  className="relative mb-4 overflow-hidden bg-white last:mb-0"
+                  className="relative mb-4 overflow-hidden rounded border bg-white dark:bg-card last:mb-0"
                   style={{
                     width: `${PAPER_WIDTH_IN}in`,
                     height: `${PAPER_HEIGHT_IN}in`,
@@ -615,7 +612,7 @@ export default function PrintPage() {
                       <Popover.Trigger asChild className="popover-trigger">
                         <div
                           onClick={() => setSelectedImage(photo)}
-                          className="group absolute overflow-hidden rounded-sm border border-transparent transition-all duration-150 hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="group absolute overflow-hidden transition-all duration-150 hover:ring-2 hover:ring-secondary hover:scale-[97.5%]"
                           style={{
                             left: `${photo.printXPx / RENDER_DPI}in`,
                             top: `${photo.printYPx / RENDER_DPI}in`,

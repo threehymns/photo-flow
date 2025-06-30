@@ -18,7 +18,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { UploadedImage } from "@/lib/types";
-import { DEFAULT_DIAGONAL_IN, DEFAULT_GAP_IN, DEFAULT_MARGIN_IN } from "@/app/page";
 import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
@@ -184,4 +183,7 @@ export function AppSidebar({
       </SidebarFooter>
     </Sidebar>
   );
-}
+}export const DEFAULT_DIAGONAL_IN = 5;
+export const DEFAULT_MARGIN_IN = 0.1;
+export const DEFAULT_GAP_IN = 0;
+
