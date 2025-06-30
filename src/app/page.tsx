@@ -6,8 +6,14 @@ import { useReactToPrint } from "react-to-print";
 import * as Popover from "@radix-ui/react-popover";
 import { Button } from "@/components/ui/button";
 import { SliderWithReset } from "@/components/ui/slider-with-reset";
-import { AppSidebar, DEFAULT_DIAGONAL_IN, DEFAULT_GAP_IN, DEFAULT_MARGIN_IN } from "@/components/layout/app-sidebar";
+import {
+  AppSidebar,
+  DEFAULT_DIAGONAL_IN,
+  DEFAULT_GAP_IN,
+  DEFAULT_MARGIN_IN,
+} from "@/components/layout/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { UploadedImage, PrintPageLayout } from "@/lib/types";
 import Image from "next/image";
 import { Image as ImageIcon, X } from "lucide-react";
@@ -63,9 +69,8 @@ PrintableContent.displayName = "PrintableContent";
 
 export default function PrintPage() {
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [globalTargetSizeIn, setGlobalTargetSizeIn] = useState<number>(
-    DEFAULT_DIAGONAL_IN,
-  );
+  const [globalTargetSizeIn, setGlobalTargetSizeIn] =
+    useState<number>(DEFAULT_DIAGONAL_IN);
   const [displayGlobalSizeIn, setDisplayGlobalSizeIn] =
     useState<number>(globalTargetSizeIn);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -578,135 +583,144 @@ export default function PrintPage() {
         setGapIn={setGapIn}
         setGlobalTargetSizeIn={setGlobalTargetSizeIn}
       />
-      <SidebarInset
-        ref={previewContainerRef}
-        className="flex items-center justify-center overflow-auto p-4"
-      >
-        {isPrintEnabled ? (
-          <div
-            className="shadow-lg"
-            style={{
-              transform: `scale(${previewScale})`,
-              transformOrigin: "top center",
-            }}
-          >
-            {pageLayouts.map((layout, pageIndex) => (
-              <React.Fragment key={pageIndex}>
-                <div className="text-muted-foreground flex w-full items-center justify-center py-2 text-sm">
-                  Page {pageIndex + 1} of {pageLayouts.length}
-                </div>
-                <div
-                  className="relative mb-4 overflow-hidden rounded border bg-white dark:bg-card last:mb-0"
-                  style={{
-                    width: `${PAPER_WIDTH_IN}in`,
-                    height: `${PAPER_HEIGHT_IN}in`,
-                    boxShadow: "0 0 0.5rem rgba(0,0,0,0.1)",
-                  }}
-                >
-                  {layout.photos.map((photo) => (
-                    <Popover.Root
-                      key={photo.id}
-                      open={selectedImage?.id === photo.id}
-                      onOpenChange={(open) => !open && setSelectedImage(null)}
+      <SidebarInset ref={previewContainerRef} className="overflow-hidden">
+        <ScrollArea className="h-[calc(100vh-1rem)] w-full">
+          <div className="flex min-h-full w-full items-center justify-center">
+            {isPrintEnabled ? (
+              <div
+                className="shadow-lg"
+                style={{
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: "top center",
+                }}
+              >
+                {pageLayouts.map((layout, pageIndex) => (
+                  <React.Fragment key={pageIndex}>
+                    <div className="text-muted-foreground flex w-full items-center justify-center py-2 text-sm">
+                      Page {pageIndex + 1} of {pageLayouts.length}
+                    </div>
+                    <div
+                      className="dark:bg-card relative mb-4 overflow-hidden rounded border bg-white last:mb-0"
+                      style={{
+                        width: `${PAPER_WIDTH_IN}in`,
+                        height: `${PAPER_HEIGHT_IN}in`,
+                        boxShadow: "0 0 0.5rem rgba(0,0,0,0.1)",
+                      }}
                     >
-                      <Popover.Trigger asChild className="popover-trigger">
-                        <div
-                          onClick={() => setSelectedImage(photo)}
-                          className="group absolute overflow-hidden transition-all duration-150 hover:ring-2 hover:ring-secondary hover:scale-[97.5%]"
-                          style={{
-                            left: `${photo.printXPx / RENDER_DPI}in`,
-                            top: `${photo.printYPx / RENDER_DPI}in`,
-                            width: `${photo.printWidthPx / RENDER_DPI}in`,
-                            height: `${photo.printHeightPx / RENDER_DPI}in`,
-                          }}
+                      {layout.photos.map((photo) => (
+                        <Popover.Root
+                          key={photo.id}
+                          open={selectedImage?.id === photo.id}
+                          onOpenChange={(open) =>
+                            !open && setSelectedImage(null)
+                          }
                         >
-                          <Image
-                            src={photo.objectUrl}
-                            alt={photo.name}
-                            fill
-                            className="h-full w-full object-cover"
-                          />
-                          {photo.targetPrintDiagonalIn !== null && (
-                            <div className="absolute right-0 bottom-0 rounded-tl-sm bg-blue-600 px-1 py-0.5 font-mono text-[8px] text-white">
-                              {photo.targetPrintDiagonalIn.toFixed(1)}&quot;
+                          <Popover.Trigger asChild className="popover-trigger">
+                            <div
+                              onClick={() => setSelectedImage(photo)}
+                              className="group hover:ring-secondary absolute overflow-hidden transition-all duration-150 hover:scale-[97.5%] hover:ring-2"
+                              style={{
+                                left: `${photo.printXPx / RENDER_DPI}in`,
+                                top: `${photo.printYPx / RENDER_DPI}in`,
+                                width: `${photo.printWidthPx / RENDER_DPI}in`,
+                                height: `${photo.printHeightPx / RENDER_DPI}in`,
+                              }}
+                            >
+                              <Image
+                                src={photo.objectUrl}
+                                alt={photo.name}
+                                fill
+                                className="h-full w-full object-cover"
+                              />
+                              {photo.targetPrintDiagonalIn !== null && (
+                                <div className="absolute right-0 bottom-0 rounded-tl-sm bg-blue-600 px-1 py-0.5 font-mono text-[8px] text-white">
+                                  {photo.targetPrintDiagonalIn.toFixed(1)}&quot;
+                                </div>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="pointer-events-none absolute top-1 right-1 h-5 w-5 rounded-full opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveImage(photo.id);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
                             </div>
-                          )}
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="pointer-events-none absolute top-1 right-1 h-5 w-5 rounded-full opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveImage(photo.id);
-                            }}
+                          </Popover.Trigger>
+                          <Popover.Content
+                            className="popover-content bg-popover text-popover-foreground z-50 w-64 rounded-md border p-4 shadow-lg"
+                            side="top"
+                            align="center"
+                            sideOffset={8}
                           >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </Popover.Trigger>
-                      <Popover.Content
-                        className="popover-content bg-popover text-popover-foreground z-50 w-64 rounded-md border p-4 shadow-lg"
-                        side="top"
-                        align="center"
-                        sideOffset={8}
-                      >
-                        <div className="space-y-4">
-                          <h4 className="text-center text-sm font-medium">
-                            Adjust Photo Size
-                          </h4>
+                            <div className="space-y-4">
+                              <h4 className="text-center text-sm font-medium">
+                                Adjust Photo Size
+                              </h4>
 
-                          <SliderWithReset
-                            id="size-slider"
-                            label="Diagonal"
-                            value={selectedImage?.targetPrintDiagonalIn ?? globalTargetSizeIn ?? DEFAULT_DIAGONAL_IN}
-                            min={1}
-                            max={10}
-                            step={0.1}
-                            onReset={() => updateSelectedImageSize(null)}
-                            format={(value) => `${value.toFixed(1)}"`}
-                            onCommit={(value) => {
-                              if (selectedImage) {
-                                updateSelectedImageSize(value);
-                              }
-                            }}
-                          />
+                              <SliderWithReset
+                                id="size-slider"
+                                label="Diagonal"
+                                value={
+                                  selectedImage?.targetPrintDiagonalIn ??
+                                  globalTargetSizeIn ??
+                                  DEFAULT_DIAGONAL_IN
+                                }
+                                min={1}
+                                max={10}
+                                step={0.1}
+                                onReset={() => updateSelectedImageSize(null)}
+                                format={(value) => `${value.toFixed(1)}"`}
+                                onCommit={(value) => {
+                                  if (selectedImage) {
+                                    updateSelectedImageSize(value);
+                                  }
+                                }}
+                              />
 
-                          <div className="flex gap-2 pt-1">
-                            <Button
-                              onClick={() => updateSelectedImageSize(null)}
-                              variant="outline"
-                              size="sm"
-                              className="h-8 flex-1 text-xs"
-                            >
-                              Reset
-                            </Button>
-                            <Button
-                              onClick={() => setSelectedImage(null)}
-                              size="sm"
-                              className="h-8 flex-1 text-xs"
-                            >
-                              Done
-                            </Button>
-                          </div>
-                        </div>
-                      </Popover.Content>
-                    </Popover.Root>
-                  ))}
+                              <div className="flex gap-2 pt-1">
+                                <Button
+                                  onClick={() => updateSelectedImageSize(null)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 flex-1 text-xs"
+                                >
+                                  Reset
+                                </Button>
+                                <Button
+                                  onClick={() => setSelectedImage(null)}
+                                  size="sm"
+                                  className="h-8 flex-1 text-xs"
+                                >
+                                  Done
+                                </Button>
+                              </div>
+                            </div>
+                          </Popover.Content>
+                        </Popover.Root>
+                      ))}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-[calc(100vh-1rem)] w-full items-center justify-center">
+                <div className="text-center">
+                  <ImageIcon className="text-muted-foreground mx-auto h-12 w-12" />
+                  <h3 className="text-muted-foreground mt-4 text-sm font-medium">
+                    No photos uploaded
+                  </h3>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Upload some photos to begin.
+                  </p>
                 </div>
-              </React.Fragment>
-            ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="m-auto text-center">
-            <ImageIcon className="text-muted-foreground mx-auto h-12 w-12" />
-            <h3 className="text-muted-foreground mt-4 text-sm font-medium">
-              No photos uploaded
-            </h3>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Upload some photos to begin.
-            </p>
-          </div>
-        )}
+        </ScrollArea>
       </SidebarInset>
       {/* Always render the PrintableContent but keep it hidden */}
       <div style={{ display: "none" }}>
