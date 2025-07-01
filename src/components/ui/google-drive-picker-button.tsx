@@ -1,3 +1,6 @@
+/// <reference types="@types/gapi" />
+/// <reference types="@types/google.picker" />
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -45,15 +48,42 @@ export function GoogleDrivePickerButton({
       if (!gapiScriptMounted) return;
       window.gapi.load("client:picker", () => {
         if (!gapiScriptMounted) return;
+
+        // Check if picker is available
+        if (window.gapi.picker) {
+          setPickerApiLoaded(true);
+          console.log("Google Picker API loaded.");
+        } else {
+          if (gapiScriptMounted) {
+            console.error("Google Picker API failed to load.");
+            setError("Google Picker API failed to load. Please refresh.");
+          }
+          // Do not proceed if picker is not loaded
+          // GapiLoaded might still be true if client part loaded.
+        }
+
+        // Set gapiLoaded to true as the 'client' part of 'client:picker' should be ready
+        // for gapi.client.load to be available.
         setGapiLoaded(true);
-        window.gapi.client.load('drive', 'v3', () => {
-          if (gapiScriptMounted) console.log("Google Drive API client loaded");
-        }).catch((err: any) => {
+        console.log("GAPI client library potentially loaded (client part of client:picker).");
+
+        // Attempt to load the 'drive' API
+        // gapi.client.load returns a Promise-like object (specifically, a gapi.client.Thenable).
+        const driveRequest = window.gapi.client.load('drive', 'v3');
+
+        driveRequest.then(
+          () => { // onFulfilled
             if (gapiScriptMounted) {
-                console.error("Error loading Google Drive API client:", err);
-                setError("Error loading Google Drive API. Please refresh.");
+              console.log("Google Drive API (v3) client loaded successfully.");
             }
-        });
+          },
+          (err: any) => { // onRejected
+            if (gapiScriptMounted) {
+              console.error("Error loading Google Drive API (v3) client:", err);
+              setError("Error loading Google Drive API services. Please refresh.");
+            }
+          }
+        );
       });
     };
     scriptGapi.onerror = () => {
@@ -127,13 +157,6 @@ export function GoogleDrivePickerButton({
     };
   }, [GOOGLE_CLIENT_ID]); // Added GOOGLE_CLIENT_ID to dependency array
 
-  // Initialize Picker API once GAPI is loaded
-  useEffect(() => {
-    if (gapiLoaded && window.gapi?.picker) {
-      setPickerApiLoaded(true);
-    }
-  }, [gapiLoaded]);
-
   // Callback for Google Picker
   const pickerCallback = useCallback(
     async (data: google.picker.ResponseObject) => {
@@ -142,7 +165,7 @@ export function GoogleDrivePickerButton({
         setIsProcessing(true);
         const filesToFetch: { id: string; name: string, mimeType?: string }[] = [];
         if (data.docs && data.docs.length > 0) {
-            data.docs.forEach((doc: google.picker.DocumentObject) => { // Added type for doc
+            data.docs.forEach((doc: google.picker.Document) => { // Added type for doc
               if (doc.id && doc.name) {
                 filesToFetch.push({ id: doc.id, name: doc.name, mimeType: doc.mimeType });
               } else {
@@ -216,8 +239,8 @@ export function GoogleDrivePickerButton({
         setIsProcessing(false);
       } else if (data.action === google.picker.Action.CANCEL) {
         console.log("Google Picker: User cancelled.");
-      } else if (data.action === google.picker.Action.PICKED) {
-        console.log("Google Picker: User picked files.");
+      } else if (data.action === google.picker.Action.LOADED) {
+        console.log("Google Picker: Loaded.");
       } else {
         console.warn("Unhandled picker action or data:", data);
         if (!error) setError("An unexpected issue occurred with the file picker.");
