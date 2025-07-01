@@ -1,11 +1,14 @@
+/// <reference types="@types/gapi" />
+/// <reference types="@types/google.picker" />
+
 "use client";
 
 import { Button } from "@/components/ui/button";
 import { ImageIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { processFiles } from "@/lib/image-processor"; // Assuming this will handle the File objects
-import type { UploadedImage } from "@/lib/types";
+import type { UploadedImage } from "@/lib/types"; // Keep for type consistency if needed elsewhere, but not for direct output
 import { env } from "@/env.js"; // Import t3-env
+// processFiles will now be called by the parent component that receives File[]
 
 const GOOGLE_API_KEY = env.NEXT_PUBLIC_GOOGLE_API_KEY;
 const GOOGLE_CLIENT_ID = env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -16,17 +19,15 @@ const GOOGLE_APP_ID = env.NEXT_PUBLIC_GOOGLE_APP_ID || ""; // APP_ID is optional
 const SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 
 type GoogleDrivePickerButtonProps = {
-  onFilesSelected: (images: UploadedImage[]) => void;
+  onFilesSelected: (files: File[]) => void; // Changed to emit File[]
   disabled?: boolean;
-  imageAcceptConfig: Record<string, string[]>; // To pass to processFiles
-  maxIndividualSize: number; // To pass to processFiles
+  // imageAcceptConfig and maxIndividualSize are no longer needed here
+  // as processFiles will be called by the parent.
 };
 
 export function GoogleDrivePickerButton({
   onFilesSelected,
   disabled = false,
-  imageAcceptConfig,
-  maxIndividualSize,
 }: GoogleDrivePickerButtonProps) {
   const [pickerApiLoaded, setPickerApiLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
@@ -76,7 +77,27 @@ export function GoogleDrivePickerButton({
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: SCOPES,
-          callback: "", // Handled by requestAccessToken promise/callback
+          callback: (tokenResponse: any) => { // Added detailed callback for success
+            if (gisScriptMounted) {
+              if (tokenResponse && tokenResponse.access_token) {
+                // Ensure gapi client is available before setting token
+                if (window.gapi && window.gapi.client) {
+                  window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+                  console.log("Token acquired, calling createPicker from GIS callback.");
+                  createPicker(); // Call createPicker on successful token acquisition
+                } else {
+                  console.error("GAPI client not ready when token received.");
+                  setError("Google API client not ready. Please refresh.");
+                }
+              } else {
+                console.error("Access token not received in GIS callback.", tokenResponse);
+                // Avoid setting error if popup was closed, as error_callback handles that.
+                if (tokenResponse?.type !== "popup_closed" && tokenResponse?.type !== "popup_failed_to_open") {
+                    setError("Failed to get Google Drive access. Please grant permission.");
+                }
+              }
+            }
+          },
           error_callback: (gisError: any) => {
             if (gisScriptMounted) {
                 console.error("GIS Error:", gisError);
@@ -116,45 +137,7 @@ export function GoogleDrivePickerButton({
     }
   }, [gapiLoaded]);
 
-  const handleAuthClick = useCallback(async () => {
-    setError(null); // Clear previous errors
-    if (!tokenClient) {
-      console.error("Google Identity Services client not initialized.");
-      setError("Google authentication is not ready. Please try again in a moment.");
-      return;
-    }
-
-    const processAuthResult = (tokenResponse: any) => {
-      // This callback is invoked when the token client successfully obtains a token or if there's an error during the token request.
-      if (tokenResponse && tokenResponse.access_token) {
-        window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-        createPicker();
-      } else {
-        // This 'else' might be hit if tokenResponse is null or doesn't have access_token.
-        // The initTokenClient's error_callback should handle more specific errors.
-        console.error("Access token not received or token response issue:", tokenResponse);
-        // Check if GIS error_callback already set an error
-        if (!error) setError("Failed to get Google Drive access. Please grant permission or check console.");
-      }
-    };
-
-    if (window.gapi?.client?.getToken()?.access_token) {
-      createPicker();
-    } else {
-      tokenClient.requestAccessToken({
-        prompt: "consent",
-        // callback: processAuthResult, // This callback in requestAccessToken is for success
-        // For GIS, the callback in initTokenClient is the primary one for success/error.
-        // However, some flows might still use this one.
-        // Let's rely on the one in initTokenClient for now to avoid duplicate calls/handling.
-        // If issues arise, this might need to be processAuthResult.
-      });
-      // The actual token processing and picker creation will be triggered by the callback in initTokenClient
-      // if requestAccessToken is successful. If it fails, error_callback in initTokenClient handles it.
-    }
-  }, [tokenClient, GOOGLE_CLIENT_ID, createPicker, error]);
-
-
+  // Callback for Google Picker
   const pickerCallback = useCallback(
     async (data: google.picker.ResponseObject) => {
       setError(null); // Clear previous errors
@@ -162,8 +145,7 @@ export function GoogleDrivePickerButton({
         setIsProcessing(true);
         const filesToFetch: { id: string; name: string, mimeType?: string }[] = [];
         if (data.docs && data.docs.length > 0) {
-            data.docs.forEach((doc) => {
-              // Ensure doc.id and doc.name exist
+            data.docs.forEach((doc: google.picker.Document) => { // Added type for doc
               if (doc.id && doc.name) {
                 filesToFetch.push({ id: doc.id, name: doc.name, mimeType: doc.mimeType });
               } else {
@@ -171,7 +153,6 @@ export function GoogleDrivePickerButton({
               }
             });
         }
-
 
         if (filesToFetch.length === 0) {
           setIsProcessing(false);
@@ -189,13 +170,19 @@ export function GoogleDrivePickerButton({
           setIsProcessing(false);
           return;
         }
-        const accessToken = token.access_token;
+        // const accessToken = token.access_token; // Not directly used, gapi client handles it
 
-        // Ensure Drive API client is loaded
         if (!window.gapi.client.drive) {
-            await new Promise<void>((resolve, reject) => {
-                window.gapi.client.load('drive', 'v3', resolve).catch(reject);
-            });
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    window.gapi.client.load('drive', 'v3', resolve).catch(reject);
+                });
+            } catch (loadErr: any) {
+                console.error("Error loading Drive API for file fetching:", loadErr);
+                setError("Failed to prepare for file download. Please try again.");
+                setIsProcessing(false);
+                return;
+            }
         }
 
         for (const fileToFetch of filesToFetch) {
@@ -214,42 +201,24 @@ export function GoogleDrivePickerButton({
                 `Failed to download file ${fileToFetch.name}. Status: ${res.status}. Body: ${errorBody}`,
               );
             }
-            // res.body is a string for text files, for binary it's ArrayBuffer like.
-            // We need to convert this to a Blob/File.
-            // The 'content-type' header from the response is crucial.
             const contentType = res.headers?.['content-type'] || fileToFetch.mimeType || 'application/octet-stream';
             const blob = new Blob([res.body], { type: contentType });
             fetchedFiles.push(new File([blob], fileToFetch.name, { type: contentType }));
 
-          } catch (error: any) {
-            console.error(`Error fetching file ${fileToFetch.name} from Google Drive:`, error);
-            // alert(`Could not download ${fileToFetch.name}: ${error.message || 'Unknown error'}`);
-            // Individual file errors are logged, and a general error might be set after the loop.
-            if (!error) setError(`Error downloading some files. Check console for details.`); // Set a general error if not already set
+          } catch (fetchError: any) {
+            console.error(`Error fetching file ${fileToFetch.name} from Google Drive:`, fetchError);
+            if (!error) setError(`Error downloading some files. Check console for details.`);
           }
         }
 
         if (fetchedFiles.length > 0) {
-          try {
-            const processed = await processFiles(
-              fetchedFiles,
-              imageAcceptConfig,
-              maxIndividualSize,
-              (progress) => console.log("Google Drive Import Progress:", progress) // TODO: Integrate with main page progress
-            );
-            onFilesSelected(processed);
-          } catch (processingError: any) {
-            console.error("Error processing files from Google Drive:", processingError);
-            setError(`Error processing images: ${processingError.message || 'Unknown error'}`);
-          }
+          onFilesSelected(fetchedFiles);
         } else if (filesToFetch.length > 0 && !error) {
-          // Files were selected, but none were fetched successfully, and no specific error was set
           setError("Could not retrieve any of the selected files.");
         }
         setIsProcessing(false);
       } else if (data.action === google.picker.Action.CANCEL) {
         console.log("Google Picker: User cancelled.");
-        // setError("File selection cancelled."); // Optional: notify user of cancellation
       } else if (data.action === google.picker.Action.LOADED) {
         console.log("Google Picker: Loaded.");
       } else {
@@ -257,7 +226,7 @@ export function GoogleDrivePickerButton({
         if (!error) setError("An unexpected issue occurred with the file picker.");
       }
     },
-    [onFilesSelected, imageAcceptConfig, maxIndividualSize, error], // Added error to dependencies
+    [onFilesSelected, error], // Removed imageAcceptConfig, maxIndividualSize from dependencies
   );
 
   const createPicker = useCallback(() => {
@@ -296,6 +265,29 @@ export function GoogleDrivePickerButton({
     const picker = pickerBuilder.build();
     picker.setVisible(true);
   }, [pickerApiLoaded, pickerCallback, GOOGLE_API_KEY, GOOGLE_APP_ID]);
+
+  // Handle authentication click
+  const handleAuthClick = useCallback(async () => {
+    setError(null);
+    if (!tokenClient) {
+      console.error("Google Identity Services client not initialized.");
+      setError("Google authentication is not ready. Please try again in a moment.");
+      return;
+    }
+
+    // The callback for token response is handled by initTokenClient's `callback` and `error_callback`
+    // when using the GIS library as configured.
+    // `initTokenClient` callback internally calls createPicker on success.
+
+    if (window.gapi?.client?.getToken()?.access_token) {
+      createPicker(); // Already has token, create picker
+    } else {
+      // No token, or token expired. Request one.
+      // The success/failure of this operation is handled by the callbacks configured in initTokenClient.
+      tokenClient.requestAccessToken({ prompt: "consent" });
+    }
+  }, [tokenClient, createPicker]); // createPicker is a stable dependency
+
 
   const handleClick = () => {
     setError(null); // Clear previous errors
