@@ -5,17 +5,13 @@ import { ImageIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { processFiles } from "@/lib/image-processor"; // Assuming this will handle the File objects
 import type { UploadedImage } from "@/lib/types";
+import { env } from "@/env.js"; // Import t3-env
 
-const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "";
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
-const GOOGLE_APP_ID = process.env.NEXT_PUBLIC_GOOGLE_APP_ID || ""; // Optional, for some picker features
+const GOOGLE_API_KEY = env.NEXT_PUBLIC_GOOGLE_API_KEY;
+const GOOGLE_CLIENT_ID = env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const GOOGLE_APP_ID = env.NEXT_PUBLIC_GOOGLE_APP_ID || ""; // APP_ID is optional
 
-if (!GOOGLE_API_KEY) {
-  console.warn("NEXT_PUBLIC_GOOGLE_API_KEY is not set. Google Drive Picker will not work.");
-}
-if (!GOOGLE_CLIENT_ID) {
-  console.warn("NEXT_PUBLIC_GOOGLE_CLIENT_ID is not set. Google Drive Picker will not work.");
-}
+// No need for manual console.warn, t3-env handles this at build/runtime if vars are missing
 
 const SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 
