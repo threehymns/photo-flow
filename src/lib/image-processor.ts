@@ -24,7 +24,7 @@ function isImageFile(file: File, imageAcceptConfig: Record<string, string[]>): b
   for (const mimeType in imageAcceptConfig) {
     if (file.type.startsWith(mimeType.replace('*', ''))) {
       const extensions = imageAcceptConfig[mimeType];
-      if (extensions && extensions.includes(fileExtension)) {
+      if (extensions?.includes(fileExtension)) {
         return true;
       }
     }
@@ -33,7 +33,7 @@ function isImageFile(file: File, imageAcceptConfig: Record<string, string[]>): b
   if (!file.type) {
     for (const mimeType in imageAcceptConfig) {
         const extensions = imageAcceptConfig[mimeType];
-        if (extensions && extensions.includes(fileExtension)) {
+        if (extensions?.includes(fileExtension)) {
             return true;
         }
     }
@@ -122,7 +122,12 @@ export async function processFiles(
   const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig));
 
   let convertedHeicCount = 0;
-  let heic2any: ((options: any) => Promise<Blob | Blob[]>) | null = null;
+  type Heic2AnyOptions = {
+    blob: Blob | File;
+    toType: string;
+    quality?: number;
+  };
+  let heic2any: ((options: Heic2AnyOptions) => Promise<Blob | Blob[]>) | null = null;
 
   if (heicFilesToConvert.length > 0) {
     onProgress?.({ type: 'conversion', loaded: convertedHeicCount, total: heicFilesToConvert.length });

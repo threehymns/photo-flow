@@ -99,9 +99,9 @@ export function AppSidebar({
               <div className="text-muted-foreground flex flex-col items-center text-sm pt-2">
                 <div className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {processingProgress.type === 'conversion' && `Converting HEIC: ${processingProgress.currentFile || ''} (${processingProgress.loaded}/${processingProgress.total})`}
-                  {processingProgress.type === 'extraction' && `Extracting from Zip: ${processingProgress.currentFile || ''} (${processingProgress.loaded}/${processingProgress.total})`}
-                  {processingProgress.type === 'loading' && (processingProgress.currentFile || 'Processing...')}
+                  {processingProgress.type === 'conversion' && `Converting HEIC: ${processingProgress.currentFile ?? ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'extraction' && `Extracting from Zip: ${processingProgress.currentFile ?? ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'loading' && (processingProgress.currentFile ?? 'Processing...')}
                 </div>
                 {(processingProgress.type === 'conversion' || processingProgress.type === 'extraction') && processingProgress.total > 0 && (
                   <Progress value={(processingProgress.loaded / processingProgress.total) * 100} className="mt-2 w-full" />
