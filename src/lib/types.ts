@@ -13,8 +13,11 @@ export type PlacedPhoto = UploadedImage & {
   printYPx: number;
   printWidthPx: number;
   printHeightPx: number;
+  isRotated: boolean; // true if the image is rotated 90 degrees
 };
 
 export type PrintPageLayout = {
   photos: PlacedPhoto[];
 };
+
+export type EmptySpace = { x: number; y: number; w: number; h: number };

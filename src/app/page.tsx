@@ -14,7 +14,7 @@ import {
 } from "@/components/layout/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { UploadedImage, PrintPageLayout } from "@/lib/types";
+import type { UploadedImage, PrintPageLayout, EmptySpace } from "@/lib/types";
 import Image from "next/image";
 import { Image as ImageIcon, X } from "lucide-react";
 
@@ -22,6 +22,52 @@ import { Image as ImageIcon, X } from "lucide-react";
 const RENDER_DPI = 96;
 const PAPER_WIDTH_IN = 8.5;
 const PAPER_HEIGHT_IN = 11;
+
+const RotatedImage = ({
+  photo,
+  className,
+}: {
+  photo: {
+    objectUrl: string;
+    name: string;
+    isRotated?: boolean;
+    printWidthPx: number;
+    printHeightPx: number;
+  };
+  className: string;
+}) => {
+  if (photo.isRotated) {
+    return (
+      <div
+        className="relative overflow-hidden w-full h-full"
+      >
+        <div
+        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rotate-90"
+          style={{
+            width: `${(photo.printHeightPx / photo.printWidthPx) * 100}%`,
+            height: `${(photo.printWidthPx / photo.printHeightPx) * 100}%`,
+          }}
+        >
+          <Image
+            src={photo.objectUrl}
+            alt={photo.name}
+            fill
+            className={className}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      src={photo.objectUrl}
+      alt={photo.name}
+      fill
+      className={className}
+    />
+  );
+};
 
 const PrintableContent = React.forwardRef<
   HTMLDivElement,
@@ -52,12 +98,7 @@ const PrintableContent = React.forwardRef<
                 height: `${photo.printHeightPx / RENDER_DPI}in`,
               }}
             >
-              <Image
-                src={photo.objectUrl}
-                alt={photo.name}
-                fill
-                style={{ objectFit: "cover" }}
-              />
+              <RotatedImage photo={photo} className="h-full w-full object-cover" />
             </div>
           ))}
         </div>
@@ -201,6 +242,67 @@ export default function PrintPage() {
     });
   }, [uploadedImages, globalTargetSizeIn]);
 
+
+  const mergeEmptySpaces = useCallback((spaces: (EmptySpace | undefined)[]): EmptySpace[] => {
+    let wasMerged = true;
+    let currentSpaces: EmptySpace[] = spaces.filter((s): s is EmptySpace => !!s);
+
+    while (wasMerged) {
+      wasMerged = false;
+      const nextSpaces: EmptySpace[] = [];
+      const mergedIndices = new Set<number>();
+
+      for (let i = 0; i < currentSpaces.length; i++) {
+        if (mergedIndices.has(i)) continue;
+
+        const r1 = currentSpaces[i]!;
+        for (let j = i + 1; j < currentSpaces.length; j++) {
+          if (mergedIndices.has(j)) continue;
+
+          const r2 = currentSpaces[j]!;
+
+          // Vertical merge
+          if (r1.x === r2.x && r1.w === r2.w) {
+            if (r1.y + r1.h === r2.y) {
+              r1.h += r2.h;
+              mergedIndices.add(j);
+              wasMerged = true;
+              continue;
+            }
+            if (r2.y + r2.h === r1.y) {
+              r1.y = r2.y;
+              r1.h += r2.h;
+              mergedIndices.add(j);
+              wasMerged = true;
+              continue;
+            }
+          }
+
+          // Horizontal merge
+          if (r1.y === r2.y && r1.h === r2.h) {
+            if (r1.x + r1.w === r2.x) {
+              r1.w += r2.w;
+              mergedIndices.add(j);
+              wasMerged = true;
+              continue;
+            }
+            if (r2.x + r2.w === r1.x) {
+              r1.x = r2.x;
+              r1.w += r2.w;
+              mergedIndices.add(j);
+              wasMerged = true;
+              continue;
+            }
+          }
+        }
+        nextSpaces.push(r1);
+      }
+
+      currentSpaces = nextSpaces;
+    }
+    return currentSpaces;
+  }, []);
+
   const calculateLayout = useCallback(() => {
     if (processedImages.length === 0) {
       setPageLayouts([]);
@@ -217,8 +319,6 @@ export default function PrintPage() {
 
     const spacingPx = gapIn * RENDER_DPI;
     const newPageLayouts: PrintPageLayout[] = [];
-
-    type EmptySpace = { x: number; y: number; w: number; h: number };
     const pageEmptySpaces: EmptySpace[][] = [];
 
     const addNewPage = () => {
@@ -235,142 +335,140 @@ export default function PrintPage() {
 
     addNewPage();
 
-    processedImages.forEach((img) => {
+    for (const img of processedImages) {
       if (
         !img.printWidthPx ||
         !img.printHeightPx ||
         img.printWidthPx <= 0 ||
         img.printHeightPx <= 0
       ) {
-        return;
+        continue;
       }
 
-      let placed = false;
-      let bestFit: { pageIdx: number; spaceIdx: number; score: number } | null =
-        null;
+      type BestFit = {
+        pageIdx: number;
+        spaceIdx: number;
+        score: number;
+        isRotated: boolean;
+        width: number;
+        height: number;
+      };
+
+      let bestFit: BestFit | null = null;
+
+      const orientationsToTry = [
+        {
+          width: img.printWidthPx,
+          height: img.printHeightPx,
+          isRotated: false,
+        },
+      ];
+      if (img.printWidthPx !== img.printHeightPx) {
+        orientationsToTry.push({
+          width: img.printHeightPx,
+          height: img.printWidthPx,
+          isRotated: true,
+        });
+      }
 
       for (let pageIdx = 0; pageIdx < newPageLayouts.length; pageIdx++) {
         const spaces = pageEmptySpaces[pageIdx];
         if (!spaces) continue;
-
         for (let spaceIdx = 0; spaceIdx < spaces.length; spaceIdx++) {
           const space = spaces[spaceIdx];
           if (!space) continue;
+          for (const orientation of orientationsToTry) {
+            const { width, height, isRotated } = orientation;
+            if (width <= space.w && height <= space.h) {
+              const leftoverW = space.w - width;
+              const leftoverH = space.h - height;
+              const score = Math.min(leftoverW, leftoverH); // BSSF
 
-          if (img.printWidthPx <= space.w && img.printHeightPx <= space.h) {
-            const score = space.w * space.h; // Simple score: prefer smaller spaces
+              if (!bestFit || score < bestFit.score) {
+                bestFit = { pageIdx, spaceIdx, score, isRotated, width, height };
+              }
+            }
+          }
+        }
+      }
+
+      if (!bestFit) {
+        addNewPage();
+        const pageIdx = newPageLayouts.length - 1;
+        const spaces = pageEmptySpaces[pageIdx];
+        const space = spaces?.[0];
+        if (!space) continue;
+
+        for (const orientation of orientationsToTry) {
+          const { width, height, isRotated } = orientation;
+          if (width <= space.w && height <= space.h) {
+            const leftoverW = space.w - width;
+            const leftoverH = space.h - height;
+            const score = Math.min(leftoverW, leftoverH);
             if (!bestFit || score < bestFit.score) {
-              bestFit = { pageIdx, spaceIdx, score };
+              bestFit = {
+                pageIdx,
+                spaceIdx: 0,
+                score,
+                isRotated,
+                width,
+                height,
+              };
             }
           }
         }
       }
 
       if (bestFit) {
-        const { pageIdx, spaceIdx } = bestFit;
-        const spaces = pageEmptySpaces[pageIdx];
-        if (!spaces || spaceIdx >= spaces.length) {
-          console.error("Invalid space index");
-          return;
-        }
-        const space = spaces[spaceIdx];
-        if (!space) {
-          console.error("Space not found");
-          return;
-        }
+        const { pageIdx, spaceIdx, isRotated, width, height } = bestFit;
+        const space = pageEmptySpaces[pageIdx]?.[spaceIdx];
+        if (!space) continue;
 
         const layout = newPageLayouts[pageIdx];
-        if (!layout) {
-          console.error("Layout not found");
-          return;
-        }
+        if (!layout) continue;
+
         layout.photos.push({
           ...img,
           printXPx: space.x,
           printYPx: space.y,
+          printWidthPx: width,
+          printHeightPx: height,
+          isRotated,
         });
 
-        const requiredWidth = img.printWidthPx + spacingPx;
-        const requiredHeight = img.printHeightPx + spacingPx;
-
+        const requiredWidth = width + spacingPx;
+        const requiredHeight = height + spacingPx;
         const newSpaces: EmptySpace[] = [];
-        // Horizontal cut:
-        // R1: space below
-        if (space.h > requiredHeight) {
-          newSpaces.push({
-            x: space.x,
-            y: space.y + requiredHeight,
-            w: space.w,
-            h: space.h - requiredHeight,
-          });
-        }
-        // R2: space to the right of photo
-        if (space.w > requiredWidth) {
-          newSpaces.push({
-            x: space.x + requiredWidth,
-            y: space.y,
-            w: space.w - requiredWidth,
-            h: img.printHeightPx,
-          });
+
+        const leftoverW = space.w - requiredWidth;
+        const leftoverH = space.h - requiredHeight;
+
+        if (leftoverW > 0 && leftoverH > 0) {
+            if (space.w > space.h) { // wide space, split vertically
+                newSpaces.push({ x: space.x + requiredWidth, y: space.y, w: leftoverW, h: space.h });
+                newSpaces.push({ x: space.x, y: space.y + requiredHeight, w: requiredWidth, h: leftoverH });
+            } else { // tall space, split horizontally
+                newSpaces.push({ x: space.x, y: space.y + requiredHeight, w: space.w, h: leftoverH });
+                newSpaces.push({ x: space.x + requiredWidth, y: space.y, w: leftoverW, h: height });
+            }
+        } else if (leftoverW > 0) {
+            newSpaces.push({ x: space.x + requiredWidth, y: space.y, w: leftoverW, h: space.h });
+        } else if (leftoverH > 0) {
+            newSpaces.push({ x: space.x, y: space.y + requiredHeight, w: space.w, h: leftoverH });
         }
 
-        spaces.splice(spaceIdx, 1, ...newSpaces);
-        placed = true;
+        const currentSpaces = pageEmptySpaces[pageIdx];
+        if(currentSpaces) {
+            currentSpaces.splice(spaceIdx, 1, ...newSpaces);
+            pageEmptySpaces[pageIdx] = mergeEmptySpaces(currentSpaces);
+        }
+      } else {
+        console.warn("Image is too large to fit on a page:", img);
       }
+    }
 
-      if (!placed) {
-        addNewPage();
-        const newPageIdx = newPageLayouts.length - 1;
-        const newPageLayout = newPageLayouts[newPageIdx];
-        const newPageSpaces = pageEmptySpaces[newPageIdx];
-
-        if (!newPageLayout || !newPageSpaces || newPageSpaces.length === 0) {
-          console.error("Failed to create a new page correctly.");
-          return;
-        }
-        const firstSpace = newPageSpaces[0];
-        if (!firstSpace) {
-          console.error("No space available on new page.");
-          return;
-        }
-
-        if (
-          img.printWidthPx <= firstSpace.w &&
-          img.printHeightPx <= firstSpace.h
-        ) {
-          newPageLayout.photos.push({
-            ...img,
-            printXPx: firstSpace.x,
-            printYPx: firstSpace.y,
-          });
-
-          const requiredWidth = img.printWidthPx + spacingPx;
-          const requiredHeight = img.printHeightPx + spacingPx;
-
-          const newSpaces: EmptySpace[] = [];
-          if (firstSpace.h > requiredHeight) {
-            newSpaces.push({
-              x: firstSpace.x,
-              y: firstSpace.y + requiredHeight,
-              w: firstSpace.w,
-              h: firstSpace.h - requiredHeight,
-            });
-          }
-          if (firstSpace.w > requiredWidth) {
-            newSpaces.push({
-              x: firstSpace.x + requiredWidth,
-              y: firstSpace.y,
-              w: firstSpace.w - requiredWidth,
-              h: img.printHeightPx,
-            });
-          }
-          newPageSpaces.splice(0, 1, ...newSpaces);
-        }
-      }
-    });
-
-    setPageLayouts(newPageLayouts);
-  }, [processedImages, marginIn, gapIn]);
+    setPageLayouts(newPageLayouts.filter(layout => layout.photos.length > 0));
+  }, [processedImages, marginIn, gapIn, mergeEmptySpaces]);
 
   const updateSelectedImageSize = useCallback(
     (sizeInInches: number | null) => {
@@ -626,12 +724,7 @@ export default function PrintPage() {
                                 height: `${photo.printHeightPx / RENDER_DPI}in`,
                               }}
                             >
-                              <Image
-                                src={photo.objectUrl}
-                                alt={photo.name}
-                                fill
-                                className="h-full w-full object-cover"
-                              />
+                              <RotatedImage photo={photo} className="h-full w-full object-cover" />
                               {photo.targetPrintDiagonalIn !== null && (
                                 <div className="absolute right-0 bottom-0 rounded-tl-sm bg-blue-600 px-1 py-0.5 font-mono text-[8px] text-white">
                                   {photo.targetPrintDiagonalIn.toFixed(1)}&quot;
