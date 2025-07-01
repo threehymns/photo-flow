@@ -637,9 +637,9 @@ export default function PrintPage() {
         displayGlobalSizeIn={displayGlobalSizeIn}
         marginIn={marginIn}
         gapIn={gapIn}
-        handleImageUpload={handleImageUpload}
-        handlePrint={handlePrint}
-        handleClearAll={handleClearAll}
+        onImageUpload={handleImageUpload} // Changed prop name for clarity
+        onPrint={handlePrint}
+        onClearAll={handleClearAll}
         setDisplayGlobalSizeIn={setDisplayGlobalSizeIn}
         setMarginIn={setMarginIn}
         setGapIn={setGapIn}
