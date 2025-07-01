@@ -161,13 +161,8 @@ export default function PrintPage() {
         maxFileSize,
         (progress) => {
           setProcessingProgress(progress);
-          if (progress.type === 'conversion') {
-            setIsConverting(true); // Keep isConverting for UI elements if needed
-            setConversionProgress((progress.loaded / progress.total) * 100);
-          } else if (progress.type === 'extraction') {
-            setIsConverting(false); // Ensure isConverting is false during extraction
-            // You might want a different progress bar for extraction if UI needs it
-          }
+          // setIsConverting and setConversionProgress calls removed as these states are no longer used directly here.
+          // AppSidebar now derives its display from processingProgress.
         }
       );
 
@@ -194,9 +189,9 @@ export default function PrintPage() {
       // Handle error (e.g., show a notification to the user)
     } finally {
       setIsLoading(false);
-      setIsConverting(false);
+       // setIsConverting(false); // Removed
       setProcessingProgress(null);
-      setConversionProgress(0);
+       // setConversionProgress(0); // Removed
     }
   };
 
