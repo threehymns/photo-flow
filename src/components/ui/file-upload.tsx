@@ -6,7 +6,6 @@ import { useCallback, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 type FileUploadProps = {
-  value: File[];
   onChange: (files: File[]) => void;
   maxFiles?: number;
   maxSize?: number;
@@ -16,7 +15,6 @@ type FileUploadProps = {
 };
 
 export function FileUpload({
-  value: files = [],
   onChange,
   maxFiles = 10,
   maxSize = 5 * 1024 * 1024, // 5MB
@@ -47,15 +45,11 @@ export function FileUpload({
         );
       });
 
-      // We no longer manage the 'files' state directly here for accumulation.
-      // The parent component is responsible for managing the list of uploaded images.
-      // This component now just passes up the newly selected/dropped files.
-      // Max file count limit is now indicative here, true enforcement happens after processing.
       if (preliminaryFilteredFiles.length > 0) {
         onChange(preliminaryFilteredFiles);
       }
     },
-    [accept, onChange], // Removed files, maxFiles, maxSize from dependencies as direct state management is removed
+    [accept, onChange],
   );
 
   const handleClick = () => {
@@ -140,7 +134,7 @@ export function FileUpload({
             size="sm"
             className="mt-2"
             onClick={handleClick}
-            disabled={disabled || files.length >= maxFiles}
+            disabled={disabled}
           >
             Browse files
           </Button>
@@ -151,16 +145,9 @@ export function FileUpload({
             multiple={maxFiles > 1}
             accept={acceptString}
             onChange={handleInputChange}
-            disabled={disabled || files.length >= maxFiles}
+            disabled={disabled}
           />
         </div>
-
-        {/* Hidden file counter */}
-        {files.length > 0 && (
-          <div className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-            {files.length}
-          </div>
-        )}
       </div>
     </div>
   );

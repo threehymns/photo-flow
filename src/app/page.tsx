@@ -185,7 +185,7 @@ export default function PrintPage() {
 
     } catch (error) {
       console.error("Error processing images:", error);
-      // Handle error (e.g., show a notification to the user)
+      // Handle error (e.g., show a notification to the user)g
     } finally {
       setIsLoading(false);
       setProcessingProgress(null);
@@ -632,19 +632,16 @@ export default function PrintPage() {
     <div className="flex w-full print:hidden">
       <AppSidebar
         isLoading={isLoading}
-        processingProgress={processingProgress} // Pass the new progress state
-        // isConverting and conversionProgress are no longer passed directly
+        processingProgress={processingProgress}
         isPrintEnabled={isPrintEnabled}
         displayGlobalSizeIn={displayGlobalSizeIn}
         marginIn={marginIn}
         gapIn={gapIn}
-        uploadedImages={uploadedImages}
         handleImageUpload={handleImageUpload}
         handlePrint={handlePrint}
         handleClearAll={handleClearAll}
         setDisplayGlobalSizeIn={setDisplayGlobalSizeIn}
         setMarginIn={setMarginIn}
-        setUploadedImages={setUploadedImages}
         setGapIn={setGapIn}
         setGlobalTargetSizeIn={setGlobalTargetSizeIn}
       />

@@ -17,7 +17,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { UploadedImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
@@ -34,14 +33,12 @@ interface AppSidebarProps {
   displayGlobalSizeIn: number;
   marginIn: number;
   gapIn: number;
-  uploadedImages: UploadedImage[];
   handleImageUpload: (files: File[]) => void;
   handlePrint: () => void;
   handleClearAll: () => void;
   setDisplayGlobalSizeIn: (value: number) => void;
   setGlobalTargetSizeIn: (value: number) => void;
   setMarginIn: (value: number) => void;
-  setUploadedImages: (value: UploadedImage[]) => void;
   setGapIn: (value: number) => void;
   className?: string;
 }
@@ -54,14 +51,12 @@ export function AppSidebar({
   displayGlobalSizeIn,
   marginIn,
   gapIn,
-  uploadedImages,
   handleImageUpload,
   handlePrint,
   handleClearAll,
   setDisplayGlobalSizeIn,
   setGlobalTargetSizeIn,
   setMarginIn,
-  setUploadedImages,
   setGapIn,
   className,
 }: AppSidebarProps) {
@@ -82,11 +77,10 @@ export function AppSidebar({
         <SidebarGroup>
           <div className="space-y-1">
             <FileUpload
-              value={uploadedImages.map((img) => img.rawFile)} // This is fine for display purposes if needed, though FileUpload doesn't use it.
-              onChange={handleImageUpload} // Pass handleImageUpload directly
-              maxFiles={1000} // Informational
-              maxSize={20 * 1024 * 1024} // Informational, actual enforcement in image-processor.ts
-              accept={{ // This should match or be a superset of what FileUpload itself defaults to, plus zips
+              onChange={handleImageUpload}
+              maxFiles={1000}
+              maxSize={20 * 1024 * 1024}
+              accept={{
                 "image/*": [
                   ".jpg",
                   ".jpeg",
@@ -94,14 +88,14 @@ export function AppSidebar({
                   ".gif",
                   ".webp",
                   ".svg",
-                  ".heic", // Keep HEIC/HEIF here so users know they can drop them
+                  ".heic",
                   ".heif",
                 ],
                 "application/zip": [".zip"],
               }}
               className="w-full"
             />
-            {isLoading && processingProgress && ( // Show progress when isLoading and progress data is available
+            {isLoading && processingProgress && (
               <div className="text-muted-foreground flex flex-col items-center text-sm pt-2">
                 <div className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -114,7 +108,6 @@ export function AppSidebar({
                 )}
               </div>
             )}
-            {/* Fallback for older isConverting flag removed as processingProgress is now comprehensive */}
           </div>
         </SidebarGroup>
 

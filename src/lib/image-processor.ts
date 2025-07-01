@@ -1,8 +1,5 @@
 import JSZip from 'jszip';
-// import heic2any from 'heic2any'; // Removed static import
 import type { UploadedImage } from '@/lib/types';
-
-console.log('IMAGE_PROCESSOR_MODULE_LOADED_TEST_LOG'); // Test log at module level
 
 // Helper function to get image dimensions
 async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -50,10 +47,6 @@ function isHeicFile(file: File): boolean {
   const typeMatch = file.type === 'image/heic' || file.type === 'image/heif';
   const extensionMatch = fileNameLower.endsWith('.heic') || fileNameLower.endsWith('.heif');
   const result = typeMatch || extensionMatch;
-  // Only log if it's potentially a HEIC/HEIF by extension, to reduce noise
-  if (fileNameLower.includes('.heic') || fileNameLower.includes('.heif')) {
-    console.log(`[isHeicFile Check] File: ${file.name}, Type: ${file.type}, typeMatch: ${typeMatch}, extensionMatch: ${extensionMatch}, Result: ${result}`);
-  }
   return result;
 }
 
@@ -100,12 +93,9 @@ export async function processFiles(
                 else if (extension === 'svg') determinedType = 'image/svg+xml';
                   else if (extension === 'heic' || extension === 'heif') {
                     determinedType = `image/${extension}`;
-                    console.log(`[Zip Extraction] Determined type for ${zipEntry.name} as ${determinedType}`);
                   }
                 } else if (extension === 'heic' || extension === 'heif') {
-                    // Blob has a type, but we also check extension for logging HEIC/HEIF
-                    console.log(`[Zip Extraction] Blob type for ${zipEntry.name} is ${blob.type}, extension is ${extension}`);
-                    determinedType = blob.type; // Use blob's type if available and specific
+                    determinedType = blob.type;
               }
               return new File([blob], zipEntry.name, { type: determinedType });
             }).catch(err => {
@@ -128,28 +118,8 @@ export async function processFiles(
     }
   }
 
-  // Phase 2: Filter by size, convert HEIC, and create UploadedImage objects
-  console.log('[Processing Phase 2] Files in filesToProcess before filtering:', filesToProcess.map(f => ({name: f.name, type: f.type, size: f.size})));
-
-  // Manual filter for debugging
-  const heicFilesToConvert: File[] = [];
-  for (const file of filesToProcess) {
-    if (isHeicFile(file)) {
-      heicFilesToConvert.push(file);
-    }
-  }
-  // const heicFilesToConvert = filesToProcess.filter(isHeicFile); // Original problematic line
-
-  console.log(`[Processing Phase 2] Found ${heicFilesToConvert.length} HEIC files to convert (manual filter):`, heicFilesToConvert.map(f => f.name));
-
-  const otherImageFiles: File[] = [];
-  for (const file of filesToProcess) {
-    if (!isHeicFile(file) && isImageFile(file, imageAcceptConfig)) {
-      otherImageFiles.push(file);
-    }
-  }
-  // const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig)); // Original
-  console.log(`[Processing Phase 2] Found ${otherImageFiles.length} other image files (manual filter).`);
+  const heicFilesToConvert = filesToProcess.filter(isHeicFile);
+  const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig));
 
   let convertedHeicCount = 0;
   let heic2any: ((options: any) => Promise<Blob | Blob[]>) | null = null;
@@ -178,7 +148,6 @@ export async function processFiles(
     }
     try {
       onProgress?.({ type: 'conversion', loaded: convertedHeicCount, total: heicFilesToConvert.length, currentFile: file.name });
-      console.log(`[HEIC Conversion] Attempting to convert: ${file.name}, type: ${file.type}, size: ${file.size}`);
       const convertedBlob = await heic2any({
         blob: file,
         toType: 'image/jpeg',
@@ -224,7 +193,7 @@ export async function processFiles(
       });
     } catch (error) {
       console.error(`Error processing file ${file.name} for UploadedImage:`, error);
-      // Object URL might not have been created or needs cleanup if error happened after creation
+      // Note: getImageDimensions creates and cleans up its own object URL internally so no cleanup needed here
     }
   }
 
