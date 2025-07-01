@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import heic2any from 'heic2any';
+// import heic2any from 'heic2any'; // Removed static import
 import type { UploadedImage } from '@/lib/types';
 
 // Helper function to get image dimensions
@@ -117,13 +117,28 @@ export async function processFiles(
   const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig));
 
   let convertedHeicCount = 0;
+  let heic2any: ((options: any) => Promise<Blob | Blob[]>) | null = null;
+
   if (heicFilesToConvert.length > 0) {
     onProgress?.({ type: 'conversion', loaded: convertedHeicCount, total: heicFilesToConvert.length });
+    try {
+      heic2any = (await import('heic2any')).default;
+    } catch (e) {
+      console.error("Failed to dynamically import heic2any:", e);
+      // If heic2any fails to load, we can't process these files.
+      // Add them to otherImageFiles to be processed as non-HEIC, or mark as error.
+      // For now, they will be filtered out later if not valid images or fail dimension checks.
+    }
   }
 
   const conversionPromises = heicFilesToConvert.map(async (file) => {
     if (file.size > maxIndividualSize) {
       console.warn(`Skipping HEIC file ${file.name} as it exceeds max size before conversion.`);
+      return null;
+    }
+    if (!heic2any) {
+      console.warn(`Skipping HEIC conversion for ${file.name} as heic2any module failed to load.`);
+      // Return the original file to see if it can be processed by other means, or null
       return null;
     }
     try {
