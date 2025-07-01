@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 // import heic2any from 'heic2any'; // Removed static import
 import type { UploadedImage } from '@/lib/types';
 
+console.log('IMAGE_PROCESSOR_MODULE_LOADED_TEST_LOG'); // Test log at module level
+
 // Helper function to get image dimensions
 async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
