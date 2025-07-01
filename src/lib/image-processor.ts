@@ -89,7 +89,14 @@ export async function processFiles(
                 else if (extension === 'gif') determinedType = 'image/gif';
                 else if (extension === 'webp') determinedType = 'image/webp';
                 else if (extension === 'svg') determinedType = 'image/svg+xml';
-                else if (extension === 'heic' || extension === 'heif') determinedType = `image/${extension}`; // Keep for HEIC check
+                  else if (extension === 'heic' || extension === 'heif') {
+                    determinedType = `image/${extension}`;
+                    console.log(`[Zip Extraction] Determined type for ${zipEntry.name} as ${determinedType}`);
+                  }
+                } else if (extension === 'heic' || extension === 'heif') {
+                    // Blob has a type, but we also check extension for logging HEIC/HEIF
+                    console.log(`[Zip Extraction] Blob type for ${zipEntry.name} is ${blob.type}, extension is ${extension}`);
+                    determinedType = blob.type; // Use blob's type if available and specific
               }
               return new File([blob], zipEntry.name, { type: determinedType });
             }).catch(err => {
@@ -143,6 +150,7 @@ export async function processFiles(
     }
     try {
       onProgress?.({ type: 'conversion', loaded: convertedHeicCount, total: heicFilesToConvert.length, currentFile: file.name });
+      console.log(`[HEIC Conversion] Attempting to convert: ${file.name}, type: ${file.type}, size: ${file.size}`);
       const convertedBlob = await heic2any({
         blob: file,
         toType: 'image/jpeg',

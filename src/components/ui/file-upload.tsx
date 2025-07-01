@@ -21,7 +21,7 @@ export function FileUpload({
   maxFiles = 10,
   maxSize = 5 * 1024 * 1024, // 5MB
   accept = {
-    "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+    "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif"],
     "application/zip": [".zip"],
   },
   disabled = false,
