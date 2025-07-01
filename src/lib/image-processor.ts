@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
 import type { UploadedImage } from '@/lib/types';
 
@@ -179,7 +180,7 @@ export async function processFiles(
       const dimensions = await getImageDimensions(file);
       const objectURL = URL.createObjectURL(file); // Create object URL here for UploadedImage
       processedImages.push({
-        id: `${Date.now()}-${processedImages.length}-${file.name}`,
+        id: uuidv4(),
         name: file.name,
         objectUrl: objectURL,
         originalWidthPx: dimensions.width,
