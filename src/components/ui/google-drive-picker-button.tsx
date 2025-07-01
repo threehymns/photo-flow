@@ -1,6 +1,3 @@
-/// <reference types="@types/gapi" />
-/// <reference types="@types/google.picker" />
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -145,7 +142,7 @@ export function GoogleDrivePickerButton({
         setIsProcessing(true);
         const filesToFetch: { id: string; name: string, mimeType?: string }[] = [];
         if (data.docs && data.docs.length > 0) {
-            data.docs.forEach((doc: google.picker.Document) => { // Added type for doc
+            data.docs.forEach((doc: google.picker.DocumentObject) => { // Added type for doc
               if (doc.id && doc.name) {
                 filesToFetch.push({ id: doc.id, name: doc.name, mimeType: doc.mimeType });
               } else {
@@ -219,8 +216,8 @@ export function GoogleDrivePickerButton({
         setIsProcessing(false);
       } else if (data.action === google.picker.Action.CANCEL) {
         console.log("Google Picker: User cancelled.");
-      } else if (data.action === google.picker.Action.LOADED) {
-        console.log("Google Picker: Loaded.");
+      } else if (data.action === google.picker.Action.PICKED) {
+        console.log("Google Picker: User picked files.");
       } else {
         console.warn("Unhandled picker action or data:", data);
         if (!error) setError("An unexpected issue occurred with the file picker.");
