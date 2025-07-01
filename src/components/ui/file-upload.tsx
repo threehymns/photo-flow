@@ -6,7 +6,6 @@ import { useCallback, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 type FileUploadProps = {
-  value: File[];
   onChange: (files: File[]) => void;
   maxFiles?: number;
   maxSize?: number;
@@ -16,12 +15,12 @@ type FileUploadProps = {
 };
 
 export function FileUpload({
-  value: files = [],
   onChange,
   maxFiles = 10,
   maxSize = 5 * 1024 * 1024, // 5MB
   accept = {
-    "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+    "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif"],
+    "application/zip": [".zip"],
   },
   disabled = false,
   className = "",
@@ -31,17 +30,26 @@ export function FileUpload({
 
   const handleFileChange = useCallback(
     (newFiles: File[]) => {
-      const validFiles = newFiles.filter(
-        (file) =>
-          file.size <= maxSize && !files.some((f) => f.name === file.name),
-      );
+      // Basic filtering for file types based on the 'accept' prop, and max file count.
+      // Deeper processing (zip extraction, HEIC conversion, individual size validation)
+      // will be handled by the callback provided to onChange.
 
-      if (validFiles.length === 0) return;
+      const acceptedFileTypes = Object.keys(accept);
+      const acceptedExtensions = Object.values(accept).flat();
 
-      const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
-      onChange(updatedFiles);
+      const preliminaryFilteredFiles = newFiles.filter(file => {
+        const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+        return (
+          acceptedFileTypes.some(type => file.type.startsWith(type.replace('*', ''))) ||
+          acceptedExtensions.includes(fileExtension)
+        );
+      });
+
+      if (preliminaryFilteredFiles.length > 0) {
+        onChange(preliminaryFilteredFiles);
+      }
     },
-    [files, maxFiles, maxSize, onChange],
+    [accept, onChange],
   );
 
   const handleClick = () => {
@@ -126,7 +134,7 @@ export function FileUpload({
             size="sm"
             className="mt-2"
             onClick={handleClick}
-            disabled={disabled || files.length >= maxFiles}
+            disabled={disabled}
           >
             Browse files
           </Button>
@@ -137,16 +145,9 @@ export function FileUpload({
             multiple={maxFiles > 1}
             accept={acceptString}
             onChange={handleInputChange}
-            disabled={disabled || files.length >= maxFiles}
+            disabled={disabled}
           />
         </div>
-
-        {/* Hidden file counter */}
-        {files.length > 0 && (
-          <div className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-            {files.length}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -17,44 +17,46 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { UploadedImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
   isLoading: boolean;
-  isConverting: boolean;
-  conversionProgress: number;
+  // isConverting: boolean; // Potentially replaced by processingProgress
+  // conversionProgress: number; // Potentially replaced by processingProgress
+  processingProgress: {
+    type: 'conversion' | 'extraction' | 'loading';
+    loaded: number;
+    total: number;
+    currentFile?: string;
+  } | null;
   isPrintEnabled: boolean;
   displayGlobalSizeIn: number;
   marginIn: number;
   gapIn: number;
-  uploadedImages: UploadedImage[];
   handleImageUpload: (files: File[]) => void;
   handlePrint: () => void;
   handleClearAll: () => void;
   setDisplayGlobalSizeIn: (value: number) => void;
   setGlobalTargetSizeIn: (value: number) => void;
   setMarginIn: (value: number) => void;
-  setUploadedImages: (value: UploadedImage[]) => void;
   setGapIn: (value: number) => void;
   className?: string;
 }
 export function AppSidebar({
   isLoading,
-  isConverting,
-  conversionProgress,
+  // isConverting: _isConverting, // No longer directly used, derived from processingProgress if needed
+  // conversionProgress: _conversionProgress, // No longer directly used
+  processingProgress,
   isPrintEnabled,
   displayGlobalSizeIn,
   marginIn,
   gapIn,
-  uploadedImages,
   handleImageUpload,
   handlePrint,
   handleClearAll,
   setDisplayGlobalSizeIn,
   setGlobalTargetSizeIn,
   setMarginIn,
-  setUploadedImages,
   setGapIn,
   className,
 }: AppSidebarProps) {
@@ -75,15 +77,9 @@ export function AppSidebar({
         <SidebarGroup>
           <div className="space-y-1">
             <FileUpload
-              value={uploadedImages.map((img) => img.rawFile)}
-              onChange={(files) => {
-                handleImageUpload(files);
-                if (files.length === 0) {
-                  setUploadedImages([]);
-                }
-              }}
+              onChange={handleImageUpload}
               maxFiles={1000}
-              maxSize={20 * 1024 * 1024} // 20MB
+              maxSize={20 * 1024 * 1024}
               accept={{
                 "image/*": [
                   ".jpg",
@@ -95,16 +91,21 @@ export function AppSidebar({
                   ".heic",
                   ".heif",
                 ],
+                "application/zip": [".zip"],
               }}
               className="w-full"
             />
-            {isConverting && (
-              <div className="text-muted-foreground flex flex-col items-center text-sm">
+            {isLoading && processingProgress && (
+              <div className="text-muted-foreground flex flex-col items-center text-sm pt-2">
                 <div className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Converting HEIC files...
+                  {processingProgress.type === 'conversion' && `Converting HEIC: ${processingProgress.currentFile ?? ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'extraction' && `Extracting from Zip: ${processingProgress.currentFile ?? ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'loading' && (processingProgress.currentFile ?? 'Processing...')}
                 </div>
-                <Progress value={conversionProgress} className="mt-2 w-full" />
+                {(processingProgress.type === 'conversion' || processingProgress.type === 'extraction') && processingProgress.total > 0 && (
+                  <Progress value={(processingProgress.loaded / processingProgress.total) * 100} className="mt-2 w-full" />
+                )}
               </div>
             )}
           </div>
