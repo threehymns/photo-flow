@@ -86,16 +86,7 @@ export async function processFiles(
               let determinedType = blob.type;
               const extension = zipEntry.name.split('.').pop()?.toLowerCase();
               if (blob.type === 'application/octet-stream' || !blob.type) {
-                if (extension === 'jpg' || extension === 'jpeg') determinedType = 'image/jpeg';
-                else if (extension === 'png') determinedType = 'image/png';
-                else if (extension === 'gif') determinedType = 'image/gif';
-                else if (extension === 'webp') determinedType = 'image/webp';
-                else if (extension === 'svg') determinedType = 'image/svg+xml';
-                  else if (extension === 'heic' || extension === 'heif') {
-                    determinedType = `image/${extension}`;
-                  }
-                } else if (extension === 'heic' || extension === 'heif') {
-                    determinedType = blob.type;
+                if (extension?.match(/jpg|jpeg|png|gif|webp|heic|heif|svg/)) determinedType = `image/${extension}`;
               }
               return new File([blob], zipEntry.name, { type: determinedType });
             }).catch(err => {
