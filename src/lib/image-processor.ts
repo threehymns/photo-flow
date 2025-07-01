@@ -45,7 +45,14 @@ function isImageFile(file: File, imageAcceptConfig: Record<string, string[]>): b
 // Helper to check if a file is a HEIC file
 function isHeicFile(file: File): boolean {
   const fileNameLower = file.name.toLowerCase();
-  return file.type === 'image/heic' || file.type === 'image/heif' || fileNameLower.endsWith('.heic') || fileNameLower.endsWith('.heif');
+  const typeMatch = file.type === 'image/heic' || file.type === 'image/heif';
+  const extensionMatch = fileNameLower.endsWith('.heic') || fileNameLower.endsWith('.heif');
+  const result = typeMatch || extensionMatch;
+  // Only log if it's potentially a HEIC/HEIF by extension, to reduce noise
+  if (fileNameLower.includes('.heic') || fileNameLower.includes('.heif')) {
+    console.log(`[isHeicFile Check] File: ${file.name}, Type: ${file.type}, typeMatch: ${typeMatch}, extensionMatch: ${extensionMatch}, Result: ${result}`);
+  }
+  return result;
 }
 
 
@@ -120,8 +127,27 @@ export async function processFiles(
   }
 
   // Phase 2: Filter by size, convert HEIC, and create UploadedImage objects
-  const heicFilesToConvert = filesToProcess.filter(isHeicFile);
-  const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig));
+  console.log('[Processing Phase 2] Files in filesToProcess before filtering:', filesToProcess.map(f => ({name: f.name, type: f.type, size: f.size})));
+
+  // Manual filter for debugging
+  const heicFilesToConvert: File[] = [];
+  for (const file of filesToProcess) {
+    if (isHeicFile(file)) {
+      heicFilesToConvert.push(file);
+    }
+  }
+  // const heicFilesToConvert = filesToProcess.filter(isHeicFile); // Original problematic line
+
+  console.log(`[Processing Phase 2] Found ${heicFilesToConvert.length} HEIC files to convert (manual filter):`, heicFilesToConvert.map(f => f.name));
+
+  const otherImageFiles: File[] = [];
+  for (const file of filesToProcess) {
+    if (!isHeicFile(file) && isImageFile(file, imageAcceptConfig)) {
+      otherImageFiles.push(file);
+    }
+  }
+  // const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig)); // Original
+  console.log(`[Processing Phase 2] Found ${otherImageFiles.length} other image files (manual filter).`);
 
   let convertedHeicCount = 0;
   let heic2any: ((options: any) => Promise<Blob | Blob[]>) | null = null;
