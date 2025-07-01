@@ -15,11 +15,12 @@ import {
 import { SidebarInset } from "@/components/ui/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { UploadedImage, PrintPageLayout, EmptySpace } from "@/lib/types";
+import { processFiles } from "@/lib/image-processor"; // Added
 import Image from "next/image";
 import { Image as ImageIcon, X } from "lucide-react";
 
 // Constants
-const RENDER_DPI = 96;
+const RENDER_DPI = 96; // Used by image-processor too, consider centralizing if used more broadly
 const PAPER_WIDTH_IN = 8.5;
 const PAPER_HEIGHT_IN = 11;
 
@@ -128,103 +129,77 @@ export default function PrintPage() {
     null,
   );
 
-  const [isConverting, setIsConverting] = useState(false);
-  const [conversionProgress, setConversionProgress] = useState(0);
+  // Combined progress state
+  const [processingProgress, setProcessingProgress] = useState<{
+    type: 'conversion' | 'extraction' | 'loading';
+    loaded: number;
+    total: number;
+    currentFile?: string;
+  } | null>(null);
 
-  const handleImageUpload = (files: File[]) => {
-    if (files.length === 0) {
+
+  const handleImageUpload = async (incomingFiles: File[]) => {
+    if (incomingFiles.length === 0 && uploadedImages.length === 0) { // only clear if nothing was there before
       setUploadedImages([]);
       return;
     }
     setIsLoading(true);
-    setIsConverting(false);
+    setProcessingProgress({ type: 'loading', loaded: 0, total: 1, currentFile: "Preparing files..." }); // Initial progress
 
-    const processFiles = async () => {
-      const heic2any = (await import("heic2any")).default;
-      const filesToConvert = files.filter(
-        (file) =>
-          file.type === "image/heic" ||
-          file.name.toLowerCase().endsWith(".heic"),
-      );
-      let convertedCount = 0;
+    // Define image acceptance criteria similar to FileUpload's default
+    const imageAcceptConfig = {
+      "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+      // No need to include zip here as processor handles it.
+      // HEIC will be handled by the processor as well.
+    };
+    const maxFileSize = 5 * 1024 * 1024; // 5MB - This should ideally come from a shared config or FileUpload props
 
-      const newImagesPromises = files.map(async (file, index) => {
-        let processedFile = file;
-        if (
-          file.type === "image/heic" ||
-          file.name.toLowerCase().endsWith(".heic")
-        ) {
-          try {
-            setIsConverting(true);
-            const convertedBlob = await heic2any({
-              blob: file,
-              toType: "image/jpeg",
-              quality: 0.8,
-            });
-            processedFile = new File(
-              [convertedBlob as Blob],
-              `${file.name.split(".")[0]}.jpeg`,
-              {
-                type: "image/jpeg",
-              },
-            );
-            convertedCount++;
-            setConversionProgress(
-              (convertedCount / filesToConvert.length) * 100,
-            );
-          } catch (error) {
-            console.error(`Failed to convert HEIC file: ${file.name}`, error);
-            throw new Error(
-              `Failed to convert HEIC file: ${file.name}. Error: ${error instanceof Error ? error.message : String(error)}`,
-            );
+    try {
+      const newProcessedImages = await processFiles(
+        incomingFiles,
+        imageAcceptConfig,
+        maxFileSize,
+        (progress) => {
+          setProcessingProgress(progress);
+          if (progress.type === 'conversion') {
+            setIsConverting(true); // Keep isConverting for UI elements if needed
+            setConversionProgress((progress.loaded / progress.total) * 100);
+          } else if (progress.type === 'extraction') {
+            setIsConverting(false); // Ensure isConverting is false during extraction
+            // You might want a different progress bar for extraction if UI needs it
           }
         }
+      );
 
-        return new Promise<UploadedImage>((resolve, reject) => {
-          const objectURL = URL.createObjectURL(processedFile);
-          const img = document.createElement("img");
-          img.onload = () => {
-            resolve({
-              id: `${Date.now()}-${index}-${processedFile.name}`,
-              name: processedFile.name,
-              objectUrl: objectURL,
-              originalWidthPx: img.width,
-              originalHeightPx: img.height,
-              targetPrintDiagonalIn: null,
-              rawFile: file, // Keep track of the original file
-            });
-          };
-          img.onerror = (errorEvent) => {
-            URL.revokeObjectURL(objectURL);
-            reject(
-              new Error(
-                `Failed to load image: ${processedFile.name}. Error: ${errorEvent instanceof Event ? `Event type: ${errorEvent.type}` : String(errorEvent)}`,
-              ),
-            );
-          };
-          img.src = objectURL;
-        });
+      // Revoke old URLs before setting new images if we are replacing them
+      // If appending, this logic needs to be smarter. For now, let's assume we replace or add.
+      // To prevent memory leaks, it's better to revoke URLs of images that are being replaced or removed.
+      // Current logic in `handleClearAll` and `handleRemoveImage` handles individual revocations.
+      // If `setUploadedImages` is replacing all, then `useEffect` unmount cleanup is critical.
+
+      setUploadedImages((prevImages) => {
+        // Simple append and sort for now. Consider de-duplication logic if needed.
+        const combined = [...prevImages, ...newProcessedImages];
+        // Deduplicate based on id - though IDs are timestamped, name might be a better check if files can be re-added
+        // For now, simple sort as before.
+        return combined.sort(
+          (a, b) =>
+            b.originalWidthPx * b.originalHeightPx -
+            a.originalWidthPx * a.originalHeightPx,
+        );
       });
 
-      try {
-        const newImages = await Promise.all(newImagesPromises);
-        setUploadedImages((prev) =>
-          [...prev, ...newImages].sort(
-            (a, b) =>
-              b.originalWidthPx * b.originalHeightPx -
-              a.originalWidthPx * a.originalHeightPx,
-          ),
-        );
-      } catch (error) {
-        console.error("Error loading images:", error);
-      } finally {
-        setIsLoading(false);
-        setIsConverting(false);
-      }
-    };
-
-    void processFiles();
+    } catch (error) {
+      console.error("Error processing images:", error);
+      // Handle error (e.g., show a notification to the user)
+    } finally {
+      setIsLoading(false);
+      setIsConverting(false);
+      setProcessingProgress(null);
+      setConversionProgress(0);
+    }
   };
+
 
   const processedImages = React.useMemo(() => {
     return uploadedImages.map((img) => {
@@ -665,8 +640,8 @@ export default function PrintPage() {
     <div className="flex w-full print:hidden">
       <AppSidebar
         isLoading={isLoading}
-        isConverting={isConverting}
-        conversionProgress={conversionProgress}
+        processingProgress={processingProgress} // Pass the new progress state
+        // isConverting and conversionProgress are no longer passed directly
         isPrintEnabled={isPrintEnabled}
         displayGlobalSizeIn={displayGlobalSizeIn}
         marginIn={marginIn}

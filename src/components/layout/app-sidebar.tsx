@@ -22,8 +22,14 @@ import { cn } from "@/lib/utils";
 
 interface AppSidebarProps {
   isLoading: boolean;
-  isConverting: boolean;
-  conversionProgress: number;
+  // isConverting: boolean; // Potentially replaced by processingProgress
+  // conversionProgress: number; // Potentially replaced by processingProgress
+  processingProgress: {
+    type: 'conversion' | 'extraction' | 'loading';
+    loaded: number;
+    total: number;
+    currentFile?: string;
+  } | null;
   isPrintEnabled: boolean;
   displayGlobalSizeIn: number;
   marginIn: number;
@@ -41,8 +47,9 @@ interface AppSidebarProps {
 }
 export function AppSidebar({
   isLoading,
-  isConverting,
-  conversionProgress,
+  // isConverting: _isConverting, // No longer directly used, derived from processingProgress if needed
+  // conversionProgress: _conversionProgress, // No longer directly used
+  processingProgress,
   isPrintEnabled,
   displayGlobalSizeIn,
   marginIn,
@@ -75,16 +82,11 @@ export function AppSidebar({
         <SidebarGroup>
           <div className="space-y-1">
             <FileUpload
-              value={uploadedImages.map((img) => img.rawFile)}
-              onChange={(files) => {
-                handleImageUpload(files);
-                if (files.length === 0) {
-                  setUploadedImages([]);
-                }
-              }}
-              maxFiles={1000}
-              maxSize={20 * 1024 * 1024} // 20MB
-              accept={{
+              value={uploadedImages.map((img) => img.rawFile)} // This is fine for display purposes if needed, though FileUpload doesn't use it.
+              onChange={handleImageUpload} // Pass handleImageUpload directly
+              maxFiles={1000} // Informational
+              maxSize={20 * 1024 * 1024} // Informational, actual enforcement in image-processor.ts
+              accept={{ // This should match or be a superset of what FileUpload itself defaults to, plus zips
                 "image/*": [
                   ".jpg",
                   ".jpeg",
@@ -92,21 +94,27 @@ export function AppSidebar({
                   ".gif",
                   ".webp",
                   ".svg",
-                  ".heic",
+                  ".heic", // Keep HEIC/HEIF here so users know they can drop them
                   ".heif",
                 ],
+                "application/zip": [".zip"],
               }}
               className="w-full"
             />
-            {isConverting && (
-              <div className="text-muted-foreground flex flex-col items-center text-sm">
+            {isLoading && processingProgress && ( // Show progress when isLoading and progress data is available
+              <div className="text-muted-foreground flex flex-col items-center text-sm pt-2">
                 <div className="flex items-center">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Converting HEIC files...
+                  {processingProgress.type === 'conversion' && `Converting HEIC: ${processingProgress.currentFile || ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'extraction' && `Extracting from Zip: ${processingProgress.currentFile || ''} (${processingProgress.loaded}/${processingProgress.total})`}
+                  {processingProgress.type === 'loading' && (processingProgress.currentFile || 'Processing...')}
                 </div>
-                <Progress value={conversionProgress} className="mt-2 w-full" />
+                {(processingProgress.type === 'conversion' || processingProgress.type === 'extraction') && processingProgress.total > 0 && (
+                  <Progress value={(processingProgress.loaded / processingProgress.total) * 100} className="mt-2 w-full" />
+                )}
               </div>
             )}
+            {/* Fallback for older isConverting flag removed as processingProgress is now comprehensive */}
           </div>
         </SidebarGroup>
 

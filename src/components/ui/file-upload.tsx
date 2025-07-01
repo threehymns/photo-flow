@@ -22,6 +22,7 @@ export function FileUpload({
   maxSize = 5 * 1024 * 1024, // 5MB
   accept = {
     "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+    "application/zip": [".zip"],
   },
   disabled = false,
   className = "",
@@ -31,17 +32,30 @@ export function FileUpload({
 
   const handleFileChange = useCallback(
     (newFiles: File[]) => {
-      const validFiles = newFiles.filter(
-        (file) =>
-          file.size <= maxSize && !files.some((f) => f.name === file.name),
-      );
+      // Basic filtering for file types based on the 'accept' prop, and max file count.
+      // Deeper processing (zip extraction, HEIC conversion, individual size validation)
+      // will be handled by the callback provided to onChange.
 
-      if (validFiles.length === 0) return;
+      const acceptedFileTypes = Object.keys(accept);
+      const acceptedExtensions = Object.values(accept).flat();
 
-      const updatedFiles = [...files, ...validFiles].slice(0, maxFiles);
-      onChange(updatedFiles);
+      const preliminaryFilteredFiles = newFiles.filter(file => {
+        const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+        return (
+          acceptedFileTypes.some(type => file.type.startsWith(type.replace('*', ''))) ||
+          acceptedExtensions.includes(fileExtension)
+        );
+      });
+
+      // We no longer manage the 'files' state directly here for accumulation.
+      // The parent component is responsible for managing the list of uploaded images.
+      // This component now just passes up the newly selected/dropped files.
+      // Max file count limit is now indicative here, true enforcement happens after processing.
+      if (preliminaryFilteredFiles.length > 0) {
+        onChange(preliminaryFilteredFiles);
+      }
     },
-    [files, maxFiles, maxSize, onChange],
+    [accept, onChange], // Removed files, maxFiles, maxSize from dependencies as direct state management is removed
   );
 
   const handleClick = () => {
