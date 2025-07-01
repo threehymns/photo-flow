@@ -148,7 +148,7 @@ export default function PrintPage() {
 
     // Define image acceptance criteria similar to FileUpload's default
     const imageAcceptConfig = {
-      "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"],
+      "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif"],
       // No need to include zip here as processor handles it.
       // HEIC will be handled by the processor as well.
     };
@@ -161,7 +161,6 @@ export default function PrintPage() {
         maxFileSize,
         (progress) => {
           setProcessingProgress(progress);
-          // setIsConverting and setConversionProgress calls removed as these states are no longer used directly here.
           // AppSidebar now derives its display from processingProgress.
         }
       );
@@ -189,9 +188,7 @@ export default function PrintPage() {
       // Handle error (e.g., show a notification to the user)
     } finally {
       setIsLoading(false);
-       // setIsConverting(false); // Removed
       setProcessingProgress(null);
-       // setConversionProgress(0); // Removed
     }
   };
 
