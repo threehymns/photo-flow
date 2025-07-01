@@ -97,11 +97,7 @@ export function AppSidebar({
               className="w-full"
             />
             <GoogleDrivePickerButton
-              onFilesSelected={onImageUpload} // Use the same handler
-              imageAcceptConfig={{ // Pass necessary config for processing
-                "image/*": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".heic", ".heif"],
-              }}
-              maxIndividualSize={20 * 1024 * 1024} // Match FileUpload's maxSize for consistency
+              onFilesSelected={onImageUpload} // Now correctly expects File[]
               disabled={isLoading}
             />
             {isLoading && processingProgress && (
