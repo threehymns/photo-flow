@@ -76,7 +76,7 @@ export function AppSidebar({
 
       <SidebarContent>
         <SidebarGroup>
-          <div className="space-y-3"> {/* Increased spacing for new button */}
+          <div className="space-y-2">
             <FileUpload
               onChange={onImageUpload} // Use the passed-in handler
               maxFiles={1000}
@@ -96,6 +96,11 @@ export function AppSidebar({
               }}
               className="w-full"
             />
+            <div className="text-center relative">
+              <hr className="w-[35%] absolute right-[calc(50%+15px)] top-1/2" />
+              or
+              <hr className="w-[35%] absolute left-[calc(50%+15px)] top-1/2" />
+            </div>
             <GoogleDrivePickerButton
               onFilesSelected={onImageUpload} // Now correctly expects File[]
               disabled={isLoading}
@@ -168,21 +173,21 @@ export function AppSidebar({
         <SidebarGroup>
           <div className="flex space-x-2">
             <Button
-              onClick={onPrint} // Use renamed prop
-              className="flex-1"
-              disabled={!isPrintEnabled || isLoading}
-            >
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-              Print
-            </Button>
-            <Button
               onClick={onClearAll} // Use renamed prop
               variant="destructive"
               className="flex-1"
               disabled={!isPrintEnabled || isLoading}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
               Clear All
+            </Button>
+            <Button
+              onClick={onPrint} // Use renamed prop
+              className="flex-1"
+              disabled={!isPrintEnabled || isLoading}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Print
             </Button>
           </div>
         </SidebarGroup>

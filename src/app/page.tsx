@@ -152,7 +152,7 @@ export default function PrintPage() {
       // No need to include zip here as processor handles it.
       // HEIC will be handled by the processor as well.
     };
-    const maxFileSize = 5 * 1024 * 1024; // 5MB - This should ideally come from a shared config or FileUpload props
+    const maxFileSize = 25 * 1024 * 1024; // 25MB - This should ideally come from a shared config or FileUpload props
 
     try {
       const newProcessedImages = await processFiles(

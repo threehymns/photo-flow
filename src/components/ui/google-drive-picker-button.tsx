@@ -4,352 +4,468 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { ImageIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { UploadedImage } from "@/lib/types"; // Keep for type consistency if needed elsewhere, but not for direct output
-import { env } from "@/env.js"; // Import t3-env
-// processFiles will now be called by the parent component that receives File[]
+import { Progress } from "@/components/ui/progress";
+import { useCallback, useEffect, useState, useRef } from "react";
+import { env } from "@/env.js";
+import Image from "next/image";
 
 const GOOGLE_API_KEY = env.NEXT_PUBLIC_GOOGLE_API_KEY;
 const GOOGLE_CLIENT_ID = env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-const GOOGLE_APP_ID = env.NEXT_PUBLIC_GOOGLE_APP_ID || ""; // APP_ID is optional
 
-// No need for manual console.warn, t3-env handles this at build/runtime if vars are missing
 
 const SCOPES = "https://www.googleapis.com/auth/drive.readonly";
+const OAUTH_TOKEN_KEY = "googleOauthToken";
 
 type GoogleDrivePickerButtonProps = {
-  onFilesSelected: (files: File[]) => void; // Changed to emit File[]
+  onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
-  // imageAcceptConfig and maxIndividualSize are no longer needed here
-  // as processFiles will be called by the parent.
 };
 
 export function GoogleDrivePickerButton({
   onFilesSelected,
   disabled = false,
 }: GoogleDrivePickerButtonProps) {
-  const [pickerApiLoaded, setPickerApiLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [tokenClient, setTokenClient] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null); // For displaying errors
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const scriptsLoaded = useRef({ gapi: false, gis: false });
 
-  // Load GAPI and GIS (Google Identity Services) scripts
-  useEffect(() => {
-    let gapiScriptMounted = true;
-    let gisScriptMounted = true;
+  const onFilesSelectedRef = useRef(onFilesSelected);
+  onFilesSelectedRef.current = onFilesSelected;
 
-    const scriptGapi = document.createElement("script");
-    scriptGapi.src = "https://apis.google.com/js/api.js";
-    scriptGapi.async = true;
-    scriptGapi.defer = true;
-    scriptGapi.onload = () => {
-      if (!gapiScriptMounted) return;
-      window.gapi.load("client:picker", () => {
-        if (!gapiScriptMounted) return;
-
-        // Check if picker is available
-        if (window.gapi.picker) {
-          setPickerApiLoaded(true);
-          console.log("Google Picker API loaded.");
-        } else {
-          if (gapiScriptMounted) {
-            console.error("Google Picker API failed to load.");
-            setError("Google Picker API failed to load. Please refresh.");
-          }
-          // Do not proceed if picker is not loaded
-          // GapiLoaded might still be true if client part loaded.
-        }
-
-        // Set gapiLoaded to true as the 'client' part of 'client:picker' should be ready
-        // for gapi.client.load to be available.
-        setGapiLoaded(true);
-        console.log("GAPI client library potentially loaded (client part of client:picker).");
-
-        // Attempt to load the 'drive' API
-        // gapi.client.load returns a Promise-like object (specifically, a gapi.client.Thenable).
-        const driveRequest = window.gapi.client.load('drive', 'v3');
-
-        driveRequest.then(
-          () => { // onFulfilled
-            if (gapiScriptMounted) {
-              console.log("Google Drive API (v3) client loaded successfully.");
-            }
-          },
-          (err: any) => { // onRejected
-            if (gapiScriptMounted) {
-              console.error("Error loading Google Drive API (v3) client:", err);
-              setError("Error loading Google Drive API services. Please refresh.");
-            }
-          }
-        );
-      });
-    };
-    scriptGapi.onerror = () => {
-        if (gapiScriptMounted) setError("Failed to load Google API script. Check connection or adblockers.");
-    }
-    document.body.appendChild(scriptGapi);
-
-    const scriptGis = document.createElement("script");
-    scriptGis.src = "https://accounts.google.com/gsi/client";
-    scriptGis.async = true;
-    scriptGis.defer = true;
-    scriptGis.onload = () => {
-      if (!gisScriptMounted || !window.google?.accounts?.oauth2) {
-        if (gisScriptMounted) setError("Google Identity Service not available after script load.");
-        return;
-      }
-      try {
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: SCOPES,
-          callback: (tokenResponse: any) => { // Added detailed callback for success
-            if (gisScriptMounted) {
-              if (tokenResponse && tokenResponse.access_token) {
-                // Ensure gapi client is available before setting token
-                if (window.gapi && window.gapi.client) {
-                  window.gapi.client.setToken({ access_token: tokenResponse.access_token });
-                  console.log("Token acquired, calling createPicker from GIS callback.");
-                  createPicker(); // Call createPicker on successful token acquisition
-                } else {
-                  console.error("GAPI client not ready when token received.");
-                  setError("Google API client not ready. Please refresh.");
-                }
-              } else {
-                console.error("Access token not received in GIS callback.", tokenResponse);
-                // Avoid setting error if popup was closed, as error_callback handles that.
-                if (tokenResponse?.type !== "popup_closed" && tokenResponse?.type !== "popup_failed_to_open") {
-                    setError("Failed to get Google Drive access. Please grant permission.");
-                }
-              }
-            }
-          },
-          error_callback: (gisError: any) => {
-            if (gisScriptMounted) {
-                console.error("GIS Error:", gisError);
-                let message = "Google Authentication Error.";
-                if (gisError?.type === "popup_closed") message = "Authentication popup closed by user.";
-                else if (gisError?.type === "popup_failed_to_open") message = "Authentication popup blocked. Please disable popup blockers.";
-                setError(message);
-            }
-          }
-        });
-        if (gisScriptMounted) setTokenClient(client);
-      } catch (e: any) {
-        if (gisScriptMounted) {
-            console.error("Error initializing GIS token client:", e);
-            setError("Failed to initialize Google Authentication.");
-        }
-      }
-    };
-    scriptGis.onerror = () => {
-        if (gisScriptMounted) setError("Failed to load Google Identity script. Check connection or adblockers.");
-    }
-    document.body.appendChild(scriptGis);
-
-    return () => {
-      gapiScriptMounted = false;
-      gisScriptMounted = false;
-      // Attempt to remove scripts if they were added
-      if (scriptGapi.parentNode) scriptGapi.parentNode.removeChild(scriptGapi);
-      if (scriptGis.parentNode) scriptGis.parentNode.removeChild(scriptGis);
-    };
-  }, [GOOGLE_CLIENT_ID]); // Added GOOGLE_CLIENT_ID to dependency array
-
-  // Callback for Google Picker
   const pickerCallback = useCallback(
     async (data: google.picker.ResponseObject) => {
-      setError(null); // Clear previous errors
-      if (data.action === google.picker.Action.PICKED) {
-        setIsProcessing(true);
-        const filesToFetch: { id: string; name: string, mimeType?: string }[] = [];
-        if (data.docs && data.docs.length > 0) {
-            data.docs.forEach((doc: google.picker.Document) => { // Added type for doc
-              if (doc.id && doc.name) {
-                filesToFetch.push({ id: doc.id, name: doc.name, mimeType: doc.mimeType });
-              } else {
-                console.warn("Picker returned a document without id or name:", doc);
-              }
-            });
-        }
-
-        if (filesToFetch.length === 0) {
-          setIsProcessing(false);
-          if (data.docs && data.docs.length > 0) {
-            setError("No valid files selected or files were missing details.");
-          }
-          return;
-        }
-
-        const fetchedFiles: File[] = [];
-        const token = window.gapi.client.getToken();
-        if (!token || !token.access_token) {
-          console.error("No access token available to fetch files.");
-          setError("Authentication error: Cannot fetch files. Please try authenticating again.");
-          setIsProcessing(false);
-          return;
-        }
-        // const accessToken = token.access_token; // Not directly used, gapi client handles it
-
-        if (!window.gapi.client.drive) {
-            try {
-                await new Promise<void>((resolve, reject) => {
-                    window.gapi.client.load('drive', 'v3', resolve).catch(reject);
-                });
-            } catch (loadErr: any) {
-                console.error("Error loading Drive API for file fetching:", loadErr);
-                setError("Failed to prepare for file download. Please try again.");
-                setIsProcessing(false);
-                return;
-            }
-        }
-
-        for (const fileToFetch of filesToFetch) {
-          try {
-            const res = await window.gapi.client.drive.files.get({
-              fileId: fileToFetch.id,
-              alt: "media",
-            });
-
-            if (res.status !== 200 || !res.body) {
-                 let errorBody = "Unknown error";
-                if (typeof res.body === 'string') errorBody = res.body;
-                else if (res.result && typeof res.result.error === 'string') errorBody = res.result.error;
-                else if (res.result && res.result.error && typeof res.result.error.message === 'string') errorBody = res.result.error.message;
-              throw new Error(
-                `Failed to download file ${fileToFetch.name}. Status: ${res.status}. Body: ${errorBody}`,
-              );
-            }
-            const contentType = res.headers?.['content-type'] || fileToFetch.mimeType || 'application/octet-stream';
-            const blob = new Blob([res.body], { type: contentType });
-            fetchedFiles.push(new File([blob], fileToFetch.name, { type: contentType }));
-
-          } catch (fetchError: any) {
-            console.error(`Error fetching file ${fileToFetch.name} from Google Drive:`, fetchError);
-            if (!error) setError(`Error downloading some files. Check console for details.`);
-          }
-        }
-
-        if (fetchedFiles.length > 0) {
-          onFilesSelected(fetchedFiles);
-        } else if (filesToFetch.length > 0 && !error) {
-          setError("Could not retrieve any of the selected files.");
-        }
-        setIsProcessing(false);
-      } else if (data.action === google.picker.Action.CANCEL) {
+      if (data.action === google.picker.Action.CANCEL) {
         console.log("Google Picker: User cancelled.");
-      } else if (data.action === google.picker.Action.LOADED) {
-        console.log("Google Picker: Loaded.");
-      } else {
-        console.warn("Unhandled picker action or data:", data);
-        if (!error) setError("An unexpected issue occurred with the file picker.");
+        return;
       }
+
+      if (data.action !== google.picker.Action.PICKED) {
+        if (data.action !== "loaded") {
+          console.warn("Unhandled picker action or data:", data);
+        }
+        return;
+      }
+
+      setError(null);
+      setIsProcessing(true);
+      setDownloadProgress(0);
+
+      const filesToFetch =
+        data.docs
+          ?.map((doc) => ({
+            id: doc.id,
+            name: doc.name,
+            mimeType: doc.mimeType,
+          }))
+          .filter((doc) => !!doc.id && !!doc.name) ?? [];
+
+      if (filesToFetch.length === 0) {
+        setIsProcessing(false);
+        setDownloadProgress(null);
+        if (data.docs && data.docs.length > 0) {
+          setError("No valid files selected or files were missing details.");
+        }
+        return;
+      }
+
+      const token = window.gapi.client.getToken();
+      if (!token?.access_token) {
+        setError(
+          "Authentication error: Cannot fetch files. Please try authenticating again.",
+        );
+        setIsProcessing(false);
+        setDownloadProgress(null);
+        return;
+      }
+
+      const fetchedFiles: File[] = [];
+      let firstError: string | null = null;
+
+      for (let i = 0; i < filesToFetch.length; i++) {
+        const fileToFetch = filesToFetch[i];
+        try {
+          if (!fileToFetch) return;
+          const res = await window.gapi.client.drive.files.get({
+            fileId: fileToFetch.id,
+            alt: "media",
+          });
+
+          if (res.status !== 200 || !res.body) {
+            let errorBody = "Unknown error";
+            if (typeof res.body === "string") errorBody = res.body;
+            else if (res.result?.error) {
+              errorBody =
+                typeof res.result.error === "string"
+                  ? res.result.error
+                  : (res.result.error as { message: string }).message;
+            }
+            throw new Error(
+              `Failed to download file ${fileToFetch.name}. Status: ${res.status}. Body: ${errorBody}`,
+            );
+          }
+          const len = res.body.length;
+          const bytes = new Uint8Array(len);
+          for (let j = 0; j < len; j++) {
+            bytes[j] = res.body.charCodeAt(j);
+          }
+
+          const contentType =
+            res.headers?.["content-type"] ??
+            fileToFetch.mimeType ??
+            "application/octet-stream";
+          const blob = new Blob([bytes.buffer], { type: contentType });
+          fetchedFiles.push(
+            new File([blob], fileToFetch?.name ?? "", { type: contentType }),
+          );
+        } catch (fetchError: any) {
+          console.error(
+            `Error fetching file ${fileToFetch?.name ?? "unknown"} from Google Drive:`,
+            fetchError,
+          );
+          if (!firstError) {
+            firstError = `Error downloading some files. Check console for details.`;
+          }
+        }
+        setDownloadProgress(((i + 1) / filesToFetch.length) * 100);
+      }
+
+      if (firstError) {
+        setError(firstError);
+      }
+
+      if (fetchedFiles.length > 0) {
+        onFilesSelectedRef.current(fetchedFiles);
+      } else if (filesToFetch.length > 0 && !firstError) {
+        setError("Could not retrieve any of the selected files.");
+      }
+      setIsProcessing(false);
+      setDownloadProgress(null);
     },
-    [onFilesSelected, error], // Removed imageAcceptConfig, maxIndividualSize from dependencies
+    [],
   );
 
   const createPicker = useCallback(() => {
-    setError(null); // Clear previous errors
-    const token = window.gapi?.client?.getToken();
-    if (!pickerApiLoaded || !token?.access_token || !GOOGLE_API_KEY) {
-        let message = "Google Picker cannot be created: ";
-        if (!GOOGLE_API_KEY) message += "API Key is missing. ";
-        else if (!pickerApiLoaded) message += "Picker API not loaded. ";
-        else if (!token?.access_token) message += "Not authenticated. ";
-        else message += "Unknown reason."
-        console.error(message);
-        setError(message + "Please try again or check console.");
+    if (!gapiLoaded || !window.google?.picker || !window.gapi?.client) {
+      setError("Google Picker API not fully initialized.");
       return;
     }
 
-    const view = new window.google.picker.View(window.google.picker.ViewId.DOCS_IMAGES_AND_VIDEOS);
-    view.setMimeTypes("image/png,image/jpeg,image/jpg,image/gif,image/webp,image/heic,image/heif,image/svg+xml");
-
+    const token = window.gapi.client.getToken();
+    if (!token?.access_token || !GOOGLE_API_KEY) {
+      setError("Missing authentication token or API key.");
+      return;
+    }
 
     const pickerBuilder = new window.google.picker.PickerBuilder()
-      .setApiKey(GOOGLE_API_KEY)
-      .setOAuthToken(window.gapi.client.getToken().access_token)
-      .addView(view)
+      .setDeveloperKey(GOOGLE_API_KEY)
+      .setOAuthToken(token.access_token)
+      .addView(
+        new window.google.picker.DocsView(
+          window.google.picker.ViewId.DOCS_IMAGES_AND_VIDEOS,
+        ).setMimeTypes(
+          "image/png,image/jpeg,image/jpg,image/gif,image/webp,image/heic,image/heif,image/svg+xml",
+        ),
+      )
       .setLocale("en")
       .setCallback(pickerCallback);
 
-    if (GOOGLE_APP_ID) {
-      pickerBuilder.setAppId(GOOGLE_APP_ID);
-    }
-
-    // Add features like multi-select and navigation
-    pickerBuilder.enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED);
-    pickerBuilder.enableFeature(window.google.picker.Feature.NAV_HIDDEN); // Example: hide navigation if desired
+    pickerBuilder.enableFeature(
+      window.google.picker.Feature.MULTISELECT_ENABLED,
+    );
+    pickerBuilder.enableFeature(window.google.picker.Feature.NAV_HIDDEN);
 
     const picker = pickerBuilder.build();
     picker.setVisible(true);
-  }, [pickerApiLoaded, pickerCallback, GOOGLE_API_KEY, GOOGLE_APP_ID]);
+  }, [gapiLoaded, pickerCallback]);
 
-  // Handle authentication click
-  const handleAuthClick = useCallback(async () => {
+  const createPickerRef = useRef(createPicker);
+  createPickerRef.current = createPicker;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadScript = (src: string, id: "gapi" | "gis") => {
+      return new Promise<void>((resolve, reject) => {
+        if (scriptsLoaded.current[id]) return resolve();
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          scriptsLoaded.current[id] = true;
+          resolve();
+        };
+        script.onerror = () =>
+          reject(new Error(`Failed to load ${id.toUpperCase()} script`));
+        document.body.appendChild(script);
+      });
+    };
+
+    const initializeGapiClient = () => {
+      return new Promise<void>((resolve, reject) => {
+        window.gapi.load("client:picker", {
+          callback: resolve,
+          onerror: reject,
+        });
+      });
+    };
+
+    const initializeDriveApi = () => {
+      return window.gapi.client.load("drive", "v3");
+    };
+
+    const initializeApis = async () => {
+      try {
+        await Promise.all([
+          loadScript("https://apis.google.com/js/api.js", "gapi"),
+          loadScript("https://accounts.google.com/gsi/client", "gis"),
+        ]);
+        if (!isMounted) return;
+
+        await initializeGapiClient();
+        if (!isMounted) return;
+
+        await initializeDriveApi();
+        if (!isMounted) return;
+
+        try {
+          const storedTokenData = localStorage.getItem(OAUTH_TOKEN_KEY);
+          if (storedTokenData) {
+            const { token, expiry } = JSON.parse(storedTokenData);
+            if (token && expiry && Date.now() < expiry) {
+              window.gapi.client.setToken({ access_token: token });
+            } else {
+              localStorage.removeItem(OAUTH_TOKEN_KEY);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to parse stored token:", e);
+          localStorage.removeItem(OAUTH_TOKEN_KEY);
+        }
+
+        setGapiLoaded(true);
+
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: SCOPES,
+          callback: (tokenResponse) => {
+            if (!isMounted) return;
+            if (tokenResponse?.access_token) {
+              const expiresIn = tokenResponse.expires_in;
+              if (expiresIn) {
+                const expiryTime =
+                  Date.now() + parseInt(String(expiresIn), 10) * 1000;
+                localStorage.setItem(
+                  OAUTH_TOKEN_KEY,
+                  JSON.stringify({
+                    token: tokenResponse.access_token,
+                    expiry: expiryTime,
+                  }),
+                );
+              }
+              window.gapi.client.setToken(tokenResponse);
+              createPickerRef.current();
+            } else if ((tokenResponse as any).error) {
+              const responseError = tokenResponse as any;
+              console.error(
+                "GIS Token Error:",
+                responseError.error,
+                responseError.error_description,
+              );
+              setError(`Authentication error: ${responseError.error}`);
+            }
+          },
+          error_callback: (error) => {
+            if (!isMounted) return;
+            console.error("GIS Error:", error);
+            setError(`Authentication error: ${error.type}`);
+          },
+        });
+        setTokenClient(client);
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.error("API Initialization Error:", error);
+        setError(`Failed to initialize Google APIs: ${error.message}`);
+      }
+    };
+
+    initializeApis();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  const handleAuthClick = useCallback(() => {
     setError(null);
     if (!tokenClient) {
       console.error("Google Identity Services client not initialized.");
-      setError("Google authentication is not ready. Please try again in a moment.");
+      setError(
+        "Google authentication is not ready. Please try again in a moment.",
+      );
       return;
     }
 
-    // The callback for token response is handled by initTokenClient's `callback` and `error_callback`
-    // when using the GIS library as configured.
-    // `initTokenClient` callback internally calls createPicker on success.
-
     if (window.gapi?.client?.getToken()?.access_token) {
-      createPicker(); // Already has token, create picker
+      createPicker();
     } else {
-      // No token, or token expired. Request one.
-      // The success/failure of this operation is handled by the callbacks configured in initTokenClient.
       tokenClient.requestAccessToken({ prompt: "consent" });
     }
-  }, [tokenClient, createPicker]); // createPicker is a stable dependency
-
+  }, [tokenClient, createPicker]);
 
   const handleClick = () => {
-    setError(null); // Clear previous errors
+    setError(null);
     if (!GOOGLE_API_KEY || !GOOGLE_CLIENT_ID) {
-        setError("Google Drive integration is not configured. Admin: Check API Key/Client ID.");
-        return;
+      setError(
+        "Google Drive integration is not configured. Admin: Check API Key/Client ID.",
+      );
+      return;
     }
     if (!gapiLoaded || !tokenClient) {
-      setError("Google services are still loading. Please wait a moment and try again.");
+      setError(
+        "Google services are still loading. Please wait a moment and try again.",
+      );
       return;
     }
     handleAuthClick();
   };
 
-  const buttonDisabled = disabled || isProcessing || !gapiLoaded || !tokenClient;
+  const buttonDisabled =
+    disabled || isProcessing || !gapiLoaded || !tokenClient;
+  const buttonText = isProcessing
+    ? `Downloading... ${downloadProgress?.toFixed(0) ?? 0}%`
+    : error
+      ? "Error! Retry?"
+      : "Import from Google Drive";
 
   return (
-    <div className="flex flex-col items-start space-y-2">
-        <Button
-          onClick={handleClick}
-          disabled={buttonDisabled}
-          variant="outline"
-          className="w-full" // Make button full width to match FileUpload
-        >
-          <ImageIcon className="mr-2 h-4 w-4" />
-          {isProcessing && "Processing..."}
-          {!isProcessing && error && "Error! Retry?"}
-          {!isProcessing && !error && "Import from Google Drive"}
-        </Button>
-        {error && (
-            <p className="text-xs text-red-500 dark:text-red-400 px-1">
-                {error}
-            </p>
-        )}
+    <div className="flex flex-col items-start space-y-2 w-full">
+      <Button
+        onClick={handleClick}
+        disabled={buttonDisabled}
+        variant="outline"
+        className="w-full"
+      >
+        <Image
+          src="https://fonts.gstatic.com/s/i/productlogos/drive_2020q4/v8/web-64dp/logo_drive_2020q4_color_2x_web_64dp.png"
+          alt="Google Drive Logo"
+          width={24}
+          height={24}
+          className="h-5 w-5"
+        />
+        {buttonText}
+      </Button>
+      {isProcessing && downloadProgress !== null && (
+        <Progress value={downloadProgress} className="w-full h-2" />
+      )}
+      {error && (
+        <p className="text-xs text-red-500 dark:text-red-400 px-1">{error}</p>
+      )}
     </div>
   );
 }
 
-// Add types for gapi and google.picker to the global window object
+// Consolidated type declarations for Google APIs
+interface PickerBuilderInstance {
+  setDeveloperKey: (key: string) => PickerBuilderInstance;
+  setOAuthToken: (token: string) => PickerBuilderInstance;
+  addView: (view: unknown) => PickerBuilderInstance;
+  setLocale: (locale: string) => PickerBuilderInstance;
+  setCallback: (
+    callback: (data: google.picker.ResponseObject) => void,
+  ) => PickerBuilderInstance;
+  setAppId: (appId: string) => PickerBuilderInstance;
+  enableFeature: (feature: string) => PickerBuilderInstance;
+  build: () => {
+    setVisible: (visible: boolean) => void;
+  };
+}
+
+interface DocsViewInstance {
+  setMimeTypes: (mimeTypes: string) => DocsViewInstance;
+}
+
 declare global {
   interface Window {
-    gapi: any;
-    google: any;
+    gapi: {
+      load: (
+        api: string,
+        options: { callback?: () => void; onerror?: (error: any) => void },
+      ) => void;
+      client: {
+        load: (
+          api: string,
+          version: string,
+          options?: {
+            callback?: (response?: any) => void;
+            onerror?: (error: any) => void;
+          },
+        ) => void;
+        setToken: (token: { access_token: string }) => void;
+        getToken: () => { access_token: string } | null;
+        drive: {
+          files: {
+            get: (params: {
+              fileId: string;
+              alt: string;
+            }) => Promise<{
+              status: number;
+              body: string;
+              headers?: Record<string, string>;
+              result?: { error?: string | { message: string } };
+            }>;
+          };
+        };
+      };
+    };
+    google: {
+      picker: {
+        View: (viewId: string) => unknown;
+        ViewId: { DOCS_IMAGES_AND_VIDEOS: string };
+        PickerBuilder: new () => PickerBuilderInstance;
+        Feature: {
+          MULTISELECT_ENABLED: string;
+          NAV_HIDDEN: string;
+        };
+        Action: {
+          PICKED: string;
+          CANCEL: string;
+        };
+        ResponseObject: {
+          action: string;
+          docs?: Array<{
+            id: string;
+            name: string;
+            mimeType?: string;
+          }>;
+        };
+        DocumentObject: {
+          id: string;
+          name: string;
+          mimeType?: string;
+        };
+        DocsView: new (viewId: string) => DocsViewInstance;
+      };
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: {
+            client_id: string;
+            scope: string;
+            callback: (response: {
+              access_token: string;
+              expires_in?: number | string;
+              error?: string;
+              error_description?: string;
+            }) => void;
+            error_callback: (error: { type: string; message: string }) => void;
+          }) => {
+            requestAccessToken: (options?: { prompt: string }) => void;
+          };
+        };
+      };
+    };
   }
 }
