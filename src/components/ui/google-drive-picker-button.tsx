@@ -23,7 +23,6 @@ interface StoredToken {
   expiry: number;
 }
 
-// Type guard to check if an object is a valid StoredToken
 function isStoredToken(obj: unknown): obj is StoredToken {
   return (
     typeof obj === 'object' && 
@@ -35,7 +34,6 @@ function isStoredToken(obj: unknown): obj is StoredToken {
   );
 }
 
-// Helper function to get token from localStorage
 const getStoredToken = (): StoredToken | null => {
   if (typeof window === 'undefined') return null;
   
@@ -50,14 +48,12 @@ const getStoredToken = (): StoredToken | null => {
         expiry: parsed.expiry
       };
     }
-    console.warn('Invalid token format in localStorage');
   } catch (e) {
     console.error('Failed to parse stored token', e);
   }
   return null;
 };
 
-// Helper function to store token in localStorage
 const storeToken = (token: string, expiresIn: number): void => {
   if (typeof window === 'undefined') return;
   const expiryTime = Date.now() + expiresIn * 1000;
@@ -65,13 +61,11 @@ const storeToken = (token: string, expiresIn: number): void => {
   localStorage.setItem(OAUTH_TOKEN_KEY, JSON.stringify(tokenData));
 };
 
-// Helper function to clear stored token
 const clearStoredToken = (): void => {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(OAUTH_TOKEN_KEY);
 };
 
-// Check if token is expired
 const isTokenExpired = (expiry: number): boolean => {
   return Date.now() >= expiry;
 };
@@ -86,7 +80,6 @@ export function GoogleDrivePickerButton({
   disabled = false,
 }: GoogleDrivePickerButtonProps) {
   const [gapiLoaded, setGapiLoaded] = useState(false);
-  // Type the tokenClient state using the interface defined in `declare global`
   const [tokenClient, setTokenClient] =
     useState<google.accounts.oauth2.TokenClient | null>(null);
   const [apiStatus, setApiStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -105,7 +98,6 @@ export function GoogleDrivePickerButton({
 
   const pickerCallback = useCallback(
     async (data: google.picker.ResponseObject) => {
-      // The action is already typed as a string by the ResponseObject type
       const action = data.action;
       
       if (action === 'cancel') {
@@ -161,7 +153,7 @@ export function GoogleDrivePickerButton({
       let firstError: string | null = null;
 
       for (let i = 0; i < filesToFetch.length; i++) {
-        const fileToFetch = filesToFetch[i]!; // Non-null assertion is safe due to the filter above
+        const fileToFetch = filesToFetch[i]!;
         try {
           const res = await window.gapi.client.drive.files.get({
             fileId: fileToFetch.id,
@@ -199,7 +191,6 @@ export function GoogleDrivePickerButton({
 
           fetchedFiles.push(new File([blob], fileToFetch.name, { type: contentType }));
         } catch (fetchError: unknown) {
-          // Catch errors as `unknown` for maximum type safety
           console.error(
             `Error fetching file ${fileToFetch.name} from Google Drive:`,
             fetchError,
@@ -458,12 +449,10 @@ export function GoogleDrivePickerButton({
   );
 }
 
-// ================================================================================= //
-// GLOBAL TYPE DECLARATIONS FOR GOOGLE APIS
-// ================================================================================= //
+/**
+ * Type definitions for Google API responses
+ */
 
-// Discriminated union for the Google Identity Services token response.
-// This allows for type-safe handling of both success and error cases.
 type TokenResponsePayload =
   | {
       access_token: string;
@@ -479,20 +468,44 @@ type TokenResponsePayload =
 
 declare global {
   interface Window {
-    // Extend the existing `gapi` object from `@types/gapi`
     gapi: {
       client: {
-        // Provide a more specific type for the `drive.files.get` response when `alt: 'media'`
-        // is used, as the standard types are often too generic for this use case.
+        /**
+         * Extended type for drive.files.get with media download support.
+         */
         drive: {
           files: {
+            /**
+             * Gets a file from Google Drive.
+             * 
+             * @param params The parameters for the request.
+             * @returns A promise that resolves with the file data.
+             */
             get: (params: {
+              /**
+               * The ID of the file to get.
+               */
               fileId: string;
+              /**
+               * The format of the response.
+               */
               alt: "media";
             }) => Promise<{
+              /**
+               * The status code of the response.
+               */
               status: number;
-              body: string; // The body is a string of char codes for media downloads
+              /**
+               * The body of the response.
+               */
+              body: string;
+              /**
+               * The headers of the response.
+               */
               headers?: Record<string, string>;
+              /**
+               * The result of the request.
+               */
               result?: { error?: string | { message: string } };
             }>;
           };
