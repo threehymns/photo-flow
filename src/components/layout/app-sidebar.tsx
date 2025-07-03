@@ -3,6 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
+import { GoogleDrivePickerButton } from "@/components/ui/google-drive-picker-button"; // Added
 import { Loader2, Printer, Trash2 } from "lucide-react";
 import { SliderWithReset } from "@/components/ui/slider-with-reset";
 import { Progress } from "@/components/ui/progress";
@@ -33,9 +34,9 @@ interface AppSidebarProps {
   displayGlobalSizeIn: number;
   marginIn: number;
   gapIn: number;
-  handleImageUpload: (files: File[]) => void;
-  handlePrint: () => void;
-  handleClearAll: () => void;
+  onImageUpload: (files: File[]) => void; // Renamed to onImageUpload
+  onPrint: () => void; // Renamed to onPrint
+  onClearAll: () => void; // Renamed to onClearAll
   setDisplayGlobalSizeIn: (value: number) => void;
   setGlobalTargetSizeIn: (value: number) => void;
   setMarginIn: (value: number) => void;
@@ -51,9 +52,9 @@ export function AppSidebar({
   displayGlobalSizeIn,
   marginIn,
   gapIn,
-  handleImageUpload,
-  handlePrint,
-  handleClearAll,
+  onImageUpload, // Keep this for handling files from both sources
+  onPrint,
+  onClearAll,
   setDisplayGlobalSizeIn,
   setGlobalTargetSizeIn,
   setMarginIn,
@@ -75,11 +76,11 @@ export function AppSidebar({
 
       <SidebarContent>
         <SidebarGroup>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <FileUpload
-              onChange={handleImageUpload}
+              onChange={onImageUpload} // Use the passed-in handler
               maxFiles={1000}
-              maxSize={20 * 1024 * 1024}
+              maxSize={20 * 1024 * 1024} // Consider making this a shared constant
               accept={{
                 "image/*": [
                   ".jpg",
@@ -94,6 +95,15 @@ export function AppSidebar({
                 "application/zip": [".zip"],
               }}
               className="w-full"
+            />
+            <div className="text-center relative">
+              <hr className="w-[35%] absolute right-[calc(50%+15px)] top-1/2" />
+              or
+              <hr className="w-[35%] absolute left-[calc(50%+15px)] top-1/2" />
+            </div>
+            <GoogleDrivePickerButton
+              onFilesSelected={onImageUpload} // Now correctly expects File[]
+              disabled={isLoading}
             />
             {isLoading && processingProgress && (
               <div className="text-muted-foreground flex flex-col items-center text-sm pt-2">
@@ -163,21 +173,21 @@ export function AppSidebar({
         <SidebarGroup>
           <div className="flex space-x-2">
             <Button
-              onClick={handlePrint}
-              className="flex-1"
-              disabled={!isPrintEnabled || isLoading}
-            >
-              {isLoading ? <Loader2 className="animate-spin" /> : <Printer />}
-              Print
-            </Button>
-            <Button
-              onClick={handleClearAll}
+              onClick={onClearAll} // Use renamed prop
               variant="destructive"
               className="flex-1"
               disabled={!isPrintEnabled || isLoading}
             >
-              <Trash2 />
+              <Trash2 className="h-4 w-4" />
               Clear All
+            </Button>
+            <Button
+              onClick={onPrint} // Use renamed prop
+              className="flex-1"
+              disabled={!isPrintEnabled || isLoading}
+            >
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+              Print
             </Button>
           </div>
         </SidebarGroup>

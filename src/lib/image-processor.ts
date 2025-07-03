@@ -19,30 +19,6 @@ async function getImageDimensions(file: File): Promise<{ width: number; height: 
   });
 }
 
-// Helper to check if a file is an image based on mime type and extension
-function isImageFile(file: File, imageAcceptConfig: Record<string, string[]>): boolean {
-  const fileExtension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
-  for (const mimeType in imageAcceptConfig) {
-    if (file.type.startsWith(mimeType.replace('*', ''))) {
-      const extensions = imageAcceptConfig[mimeType];
-      if (extensions?.includes(fileExtension)) {
-        return true;
-      }
-    }
-  }
-  // Fallback for files that might not have a type (e.g. from zip) but have a valid extension
-  if (!file.type) {
-    for (const mimeType in imageAcceptConfig) {
-        const extensions = imageAcceptConfig[mimeType];
-        if (extensions?.includes(fileExtension)) {
-            return true;
-        }
-    }
-  }
-  return false;
-}
-
-// Helper to check if a file is a HEIC file
 function isHeicFile(file: File): boolean {
   const fileNameLower = file.name.toLowerCase();
   const typeMatch = file.type === 'image/heic' || file.type === 'image/heif';
@@ -81,7 +57,7 @@ export async function processFiles(
         const imagePromises: Promise<File | null>[] = [];
 
         zip.forEach((relativePath, zipEntry) => {
-          if (!zipEntry.dir && isImageFile({ name: zipEntry.name, type: '' } as File, imageAcceptConfig)) { // Use a mock File for isImageFile
+          if (!zipEntry.dir) { // Basic check to exclude directories
             const promise = zipEntry.async('blob').then(blob => {
               // Try to determine mime type from extension if blob.type is generic
               let determinedType = blob.type;
@@ -111,7 +87,7 @@ export async function processFiles(
   }
 
   const heicFilesToConvert = filesToProcess.filter(isHeicFile);
-  const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file) && isImageFile(file, imageAcceptConfig));
+  const otherImageFiles = filesToProcess.filter(file => !isHeicFile(file));
 
   let convertedHeicCount = 0;
   type Heic2AnyOptions = {
@@ -170,10 +146,6 @@ export async function processFiles(
     if (file.size > maxIndividualSize) {
       console.warn(`Skipping file ${file.name} as it exceeds max size ${maxIndividualSize}. Size: ${file.size}`);
       continue;
-    }
-    if (!isImageFile(file, imageAcceptConfig)) { // Final check after potential conversions
-        console.warn(`Skipping file ${file.name} as it's not a recognized image type after processing.`);
-        continue;
     }
 
     try {
