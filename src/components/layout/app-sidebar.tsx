@@ -4,7 +4,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
 import { GoogleDrivePickerButton } from "@/components/ui/google-drive-picker-button"; // Added
-import { Loader2, Printer, Trash2, CloudUpload } from "lucide-react"; // Added CloudUpload for GDrive
+import { Loader2, Printer, Trash2 } from "lucide-react";
 import { SliderWithReset } from "@/components/ui/slider-with-reset";
 import { Progress } from "@/components/ui/progress";
 import {
